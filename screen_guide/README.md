@@ -68,7 +68,7 @@ android/app/src/main/kotlin/com/screenguide/screen_guide/
 
 | 담당 | 할 일 |
 |---|---|
-| 분석 (강민준) | Kotlin 채널을 계약 v1 형식으로 수정 (`imagePath`·`guidance`·`target` 받기, 응답 JSON, 요청으로 받은 맵 사용), OCR 글자 로그 제거, 정규식 `\b` 결함 수정. 지금 `FAKE_ANALYZER=false`로 돌리면 `NO_PATH`가 나는 것이 이 때문 |
-| 화면·흐름 | G·GS·RG 화면을 Figma 수치와 대조, ActionRegistry, P·SHARE·HISTORY·SETTINGS·DENY·카메라 화면 |
-| 데이터·입출력 | 기능 맵 스키마·GuidanceRepository(체험용 `demo_guidance.dart` 교체), image_picker, 이력 DB, share_plus, Firebase |
+| 팀원 1 (분석·AI) | Kotlin 채널을 계약 v1 형식으로 수정 (`imagePath`·`guidance`·`target` 받기, 응답 JSON, 요청으로 받은 맵 사용), OCR 글자 로그 제거, 정규식 `\b` 결함 수정. 지금 `FAKE_ANALYZER=false`로 돌리면 `NO_PATH`가 나는 것이 이 때문 |
+| 팀원 2 (화면·흐름) | G·GS·RG 화면을 Figma 수치와 대조, ActionRegistry, P·SHARE·HISTORY·SETTINGS·DENY·카메라 화면 |
+| 팀원 3 (데이터·입출력) | 기능 맵 스키마·GuidanceRepository(체험용 `demo_guidance.dart` 교체), image_picker, 이력 DB, share_plus, Firebase |
 | 공통 | release 빌드 시 ML Kit가 코드 축소(R8)로 깨져 시작 즉시 종료됨 → proguard keep 규칙 필요. 계약에 "선택 확정" ActionId 추가 여부 (지금은 `captureGallery` 재사용) |
