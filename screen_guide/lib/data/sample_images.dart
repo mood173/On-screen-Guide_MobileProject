@@ -28,9 +28,11 @@ class SampleImage {
   final List<UiElement> elements;
   final List<PiiCandidate> pii;
 
+  /// 에셋 경로 또는 캐시에 복사한 파일 경로로 샘플을 찾는다 (파일 이름으로 비교).
   static SampleImage? byPath(String path) {
+    final name = path.split(RegExp(r'[\\/]')).last;
     for (final s in all) {
-      if (s.asset == path) return s;
+      if (s.asset.split('/').last == name) return s;
     }
     return null;
   }

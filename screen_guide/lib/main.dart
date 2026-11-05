@@ -15,8 +15,7 @@ import 'ui/screen/review_screen.dart';
 import 'ui/theme/app_theme.dart';
 
 void main() {
-  final deps = bootstrap();
-  runApp(ScreenGuideApp(flow: GuideFlow(analyzer: deps.analyzer)));
+  runApp(ScreenGuideApp(flow: bootstrap().createFlow()));
 }
 
 class ScreenGuideApp extends StatelessWidget {

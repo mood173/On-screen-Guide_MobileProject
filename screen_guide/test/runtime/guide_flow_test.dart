@@ -6,6 +6,7 @@ import 'package:screen_guide/core/flow_state.dart';
 import 'package:screen_guide/core/screen_id.dart';
 import 'package:screen_guide/data/demo_guidance.dart';
 import 'package:screen_guide/data/fake_analyzer.dart';
+import 'package:screen_guide/data/image_files.dart';
 import 'package:screen_guide/data/sample_images.dart';
 import 'package:screen_guide/domain/screen_analyzer.dart';
 import 'package:screen_guide/runtime/guide_flow.dart';
@@ -34,6 +35,16 @@ class _HoldAnalyzer implements ScreenAnalyzer {
   }
 
   int get pending => _done.length;
+}
+
+class _RecordingFiles implements ImageFiles {
+  final released = <String>[];
+  var _n = 0;
+  @override
+  Future<String> prepare(SampleImage sample) async =>
+      '/cache/sg_${++_n}/${sample.asset.split('/').last}';
+  @override
+  Future<void> release(String path) async => released.add(path);
 }
 
 void main() {
@@ -151,6 +162,22 @@ void main() {
     await running;
     expect(f.slow, isFalse);
     expect(f.screen, ScreenId.rg);
+  });
+
+  test('분석 요청에는 복사본 파일 경로가 들어가고, 홈으로 가면 복사본을 지운다', () async {
+    final files = _RecordingFiles();
+    final hold = _HoldAnalyzer();
+    final f = GuideFlow(analyzer: hold, files: files);
+    await f.dispatch(ActionId.captureGallery);
+    await f.dispatch(ActionId.captureGallery, SampleImage.chat);
+    await f.dispatch(ActionId.captureGallery);
+    await f.dispatch(ActionId.analyzeRun);
+
+    expect(hold.calls.single.imagePath, '/cache/sg_1/sample_chat.png');
+    expect(f.result!.screenId, 'chat', reason: '가짜 분석기는 파일 이름으로 샘플을 찾는다');
+
+    await f.dispatch(ActionId.navHome);
+    expect(files.released, ['/cache/sg_1/sample_chat.png']);
   });
 
   test('준비 중인 기능은 안내 문구만 남긴다', () async {

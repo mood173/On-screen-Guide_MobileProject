@@ -1,3 +1,6 @@
+// 생성자 인자 이름은 공개(analyzer, files), 필드는 비공개로 두려고 initializing formal을 쓰지 않는다.
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -8,6 +11,7 @@ import '../core/error_code.dart';
 import '../core/flow_state.dart';
 import '../core/screen_id.dart';
 import '../data/demo_guidance.dart';
+import '../data/image_files.dart';
 import '../data/sample_images.dart';
 import '../domain/screen_analyzer.dart';
 
@@ -18,10 +22,16 @@ import '../domain/screen_analyzer.dart';
 class GuideFlow extends ChangeNotifier {
   GuideFlow({
     required ScreenAnalyzer analyzer,
+    ImageFiles files = const AssetPathImageFiles(),
     this.slowAfter = const Duration(seconds: 3),
-  }) : _analyzer = analyzer; // ignore: prefer_initializing_formals — 공개 이름은 analyzer, 필드는 비공개
+  }) : _analyzer = analyzer,
+       _files = files;
 
   final ScreenAnalyzer _analyzer;
+  final ImageFiles _files;
+
+  /// 분석 요청에 넣는 파일 경로 (앱 캐시에 만든 복사본)
+  String? _imagePath;
 
   /// 이 시간이 지나도 분석이 끝나지 않으면 [slow]를 켠다 (계약 v1 결정 3: 오류로 끊지 않음).
   final Duration slowAfter;
@@ -115,10 +125,11 @@ class GuideFlow extends ChangeNotifier {
     if (!allows(id)) return;
     switch (id) {
       case ActionId.captureGallery:
-        _gallery(arg);
+        await _gallery(arg);
       case ActionId.captureRetake:
         _go(ScreenId.g, FlowState.idle);
         picked = null;
+        _releaseFile();
       case ActionId.analyzeRun:
         await _analyzeFirst();
       case ActionId.analyzeCancel:
@@ -147,20 +158,29 @@ class GuideFlow extends ChangeNotifier {
   void clearNotice() => notice = null;
 
   // ───────────── 기능 (핸들러) ─────────────
-  void _gallery(Object? arg) {
+  Future<void> _gallery(Object? arg) async {
     if (screen == ScreenId.h) {
       _go(ScreenId.g, FlowState.idle);
     } else if (arg is SampleImage) {
       picked = arg; // G·GS에서 이미지를 누름 → 선택 상태
       _go(ScreenId.gs, FlowState.idle);
     } else if (screen == ScreenId.gs && picked != null) {
-      _go(ScreenId.gr, FlowState.picked); // "선택한 이미지 사용"
+      // "선택한 이미지 사용": Kotlin이 열 수 있는 파일 경로를 준비한다
+      _releaseFile();
+      _imagePath = await _files.prepare(picked!);
+      _go(ScreenId.gr, FlowState.picked);
     }
+  }
+
+  void _releaseFile() {
+    final p = _imagePath;
+    _imagePath = null;
+    if (p != null) _files.release(p);
   }
 
   AnalyzeRequest _request({TargetRequest? target}) => AnalyzeRequest(
     requestId: 'r${++_seq}',
-    imagePath: picked!.asset,
+    imagePath: _imagePath ?? picked!.asset,
     guidance: DemoGuidance.fragment,
     target: target,
   );
@@ -282,6 +302,7 @@ class GuideFlow extends ChangeNotifier {
     _pendingId = null;
     _slowTimer?.cancel();
     picked = null;
+    _releaseFile(); // 앱이 만든 복사본 정리
     result = null;
     action = null;
     step = 0;
