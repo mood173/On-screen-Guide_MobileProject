@@ -1,41 +1,24 @@
 import '../contract/analysis.dart';
 import '../core/error_code.dart';
 import '../domain/screen_analyzer.dart';
+import 'sample_images.dart';
 
-/// 가짜 분석기. 계약 v1 문서의 예시 응답(시험 앱 샘플 1: 설정 화면)을 돌려준다.
+/// 가짜 분석기. 요청의 imagePath로 [SampleImage]를 찾아 그 샘플의 실제 OCR 결과를 돌려준다.
+/// 모르는 경로면 설정 화면 샘플로 본다.
 ///
-/// - 요청의 requestId를 그대로 돌려준다.
-/// - 요청에 target이 없으면 응답 target도 null (기능 선택 전 첫 분석).
-/// - target.selector가 elements 라벨과 같으면 exact로 찾고, 아니면 null (NO_TARGET 시험용).
+/// 진짜 Kotlin 분석기와 같은 규칙을 흉내 낸다 (설계 10장):
+/// - 화면 식별: 요청에 함께 온 기능 맵 조각의 anchors 중 2개 이상이 보여야 그 화면. 아니면 screenId null.
+/// - 대상 찾기: 정확 일치(공백 무시) → 없으면 길이가 같고 한 글자만 다른 후보가 1개일 때만 fuzzy. 그 외 null.
 /// - [failWith]를 주면 그 오류로 실패한다 (E 화면 시험용).
 class FakeAnalyzer implements ScreenAnalyzer {
   FakeAnalyzer({
-    this.delay = const Duration(milliseconds: 600),
+    this.delay = const Duration(milliseconds: 1200),
     this.failWith,
-    this.unknownScreen = false,
   });
 
-  /// 분석 중 화면을 볼 수 있게 일부러 기다리는 시간. 3초 초과 처리를 시험하려면 늘린다.
+  /// 분석 중 화면을 볼 수 있게 일부러 기다리는 시간.
   final Duration delay;
   final ErrorCode? failWith;
-
-  /// true면 화면 미식별(screenId == null) 응답을 준다.
-  final bool unknownScreen;
-
-  static const imageSize = (w: 1080, h: 2340);
-
-  /// 실제 분석기와 같은 규칙(설계 10장)을 지킨다: 위→아래·왼→오른쪽 정렬, 빈 라벨 없음.
-  static const sampleElements = [
-    UiElement(label: '설정', box: Box(80, 380, 190, 440)),
-    UiElement(label: '설정 검색', box: Box(110, 520, 250, 560)),
-    UiElement(label: '네트워크 및 인터넷', box: Box(196, 670, 520, 712)),
-    UiElement(label: '연결된 기기', box: Box(196, 850, 392, 892)),
-    UiElement(label: '앱', box: Box(196, 940, 228, 982)),
-    UiElement(label: '알림 설정', box: Box(174, 1029, 341, 1070)),
-    UiElement(label: '배터리', box: Box(196, 1390, 306, 1432)),
-    UiElement(label: '010-1234-5678', box: Box(196, 1440, 420, 1478)),
-    UiElement(label: '디스플레이', box: Box(196, 1930, 398, 1972)),
-  ];
 
   @override
   Future<AnalysisResult> analyze(AnalyzeRequest request) async {
@@ -44,38 +27,68 @@ class FakeAnalyzer implements ScreenAnalyzer {
       return AnalysisResult.error(request.requestId, failWith!);
     }
 
-    TargetMatch? target;
-    final selector = request.target?.selector;
-    if (selector != null) {
-      for (final e in sampleElements) {
-        if (e.label == selector) {
-          target = TargetMatch(
-            label: e.label,
-            box: e.box,
-            match: MatchKind.exact,
-          );
-          break;
-        }
-      }
-    }
+    final sample =
+        SampleImage.byPath(request.imagePath) ?? SampleImage.settings;
+    final elements = sample.elements;
 
     return AnalysisResult(
       requestId: request.requestId,
       ok: true,
-      imageWidth: imageSize.w,
-      imageHeight: imageSize.h,
-      screenId: unknownScreen ? null : 'settings',
-      elements: sampleElements,
-      target: target,
-      pii: const [
-        PiiCandidate(type: '휴대전화', masked: '010-****-**78', elementIndex: 7),
-      ],
+      imageWidth: sample.width,
+      imageHeight: sample.height,
+      screenId: _identify(elements, request.guidance),
+      elements: elements,
+      target: request.target == null
+          ? null
+          : _findTarget(elements, request.target!.selector),
+      pii: sample.pii,
       piiEngine: const PiiEngine(
         regex: EngineStatus.ok,
         mlkit: EngineStatus.ok,
       ),
       ocrMs: delay.inMilliseconds,
       totalMs: delay.inMilliseconds,
+    );
+  }
+
+  static String _norm(String s) => s.replaceAll(RegExp(r'[\s·:]'), '');
+
+  static bool _hasAnchor(String label, String anchor) =>
+      _norm(label) == _norm(anchor) ||
+      label.split(RegExp(r'\s+')).any((w) => _norm(w) == _norm(anchor));
+
+  static String? _identify(List<UiElement> elements, GuidanceFragment g) {
+    for (final s in g.screens) {
+      final seen = s.anchors
+          .where((a) => elements.any((e) => _hasAnchor(e.label, a)))
+          .length;
+      if (seen >= 2) return s.screenId;
+    }
+    return null;
+  }
+
+  static TargetMatch? _findTarget(List<UiElement> elements, String selector) {
+    final s = _norm(selector);
+    for (final e in elements) {
+      if (_norm(e.label) == s) {
+        return TargetMatch(label: e.label, box: e.box, match: MatchKind.exact);
+      }
+    }
+    if (s.length < 2) return null;
+    final near = elements.where((e) {
+      final l = _norm(e.label);
+      if (l.length != s.length) return false;
+      var diff = 0;
+      for (var i = 0; i < l.length; i++) {
+        if (l[i] != s[i]) diff++;
+      }
+      return diff == 1;
+    }).toList();
+    if (near.length != 1) return null;
+    return TargetMatch(
+      label: near.first.label,
+      box: near.first.box,
+      match: MatchKind.fuzzy,
     );
   }
 }
