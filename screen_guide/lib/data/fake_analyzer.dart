@@ -24,12 +24,13 @@ class FakeAnalyzer implements ScreenAnalyzer {
 
   static const imageSize = (w: 1080, h: 2340);
 
+  /// 실제 분석기와 같은 규칙(설계 10장)을 지킨다: 위→아래·왼→오른쪽 정렬, 빈 라벨 없음.
   static const sampleElements = [
     UiElement(label: '설정', box: Box(80, 380, 190, 440)),
     UiElement(label: '설정 검색', box: Box(110, 520, 250, 560)),
     UiElement(label: '네트워크 및 인터넷', box: Box(196, 670, 520, 712)),
     UiElement(label: '연결된 기기', box: Box(196, 850, 392, 892)),
-    UiElement(label: '앱', box: Box(196, 1030, 228, 1072)),
+    UiElement(label: '앱', box: Box(196, 940, 228, 982)),
     UiElement(label: '알림 설정', box: Box(174, 1029, 341, 1070)),
     UiElement(label: '배터리', box: Box(196, 1390, 306, 1432)),
     UiElement(label: '010-1234-5678', box: Box(196, 1440, 420, 1478)),

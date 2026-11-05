@@ -51,6 +51,16 @@ void main() {
       }
     });
 
+    test('요소는 위→아래·왼→오른쪽 순서이고 빈 라벨이 없다 (설계 10장 OCR → UI 요소)', () async {
+      final r = await fake.analyze(_req());
+      for (var i = 1; i < r.elements.length; i++) {
+        final a = r.elements[i - 1].box, b = r.elements[i].box;
+        expect(a.top < b.top || (a.top == b.top && a.left <= b.left), isTrue,
+            reason: '${r.elements[i - 1].label} → ${r.elements[i].label}');
+      }
+      expect(r.elements.every((e) => e.label.trim().isNotEmpty), isTrue);
+    });
+
     test('failWith로 오류를 낸다', () async {
       final r = await FakeAnalyzer(delay: Duration.zero, failWith: ErrorCode.imageReadFailed)
           .analyze(_req());
