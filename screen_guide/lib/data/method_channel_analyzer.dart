@@ -10,7 +10,7 @@ import '../domain/screen_analyzer.dart';
 /// Kotlin이 result.error(code)로 실패를 알리면 같은 모양의 오류 결과로 바꾼다.
 class MethodChannelAnalyzer implements ScreenAnalyzer {
   MethodChannelAnalyzer({MethodChannel? channel})
-      : _channel = channel ?? const MethodChannel(channelName);
+    : _channel = channel ?? const MethodChannel(channelName);
 
   static const channelName = 'screen_guide/analyze';
   static const methodName = 'analyze';
@@ -25,11 +25,17 @@ class MethodChannelAnalyzer implements ScreenAnalyzer {
         request.toJson(),
       );
       if (raw == null) {
-        return AnalysisResult.error(request.requestId, ErrorCode.analysisFailed);
+        return AnalysisResult.error(
+          request.requestId,
+          ErrorCode.analysisFailed,
+        );
       }
       return AnalysisResult.fromJson(Map<String, dynamic>.from(raw));
     } on PlatformException catch (e) {
-      return AnalysisResult.error(request.requestId, ErrorCode.fromWire(e.code));
+      return AnalysisResult.error(
+        request.requestId,
+        ErrorCode.fromWire(e.code),
+      );
     } on MissingPluginException {
       return AnalysisResult.error(request.requestId, ErrorCode.analysisFailed);
     } on TypeError {

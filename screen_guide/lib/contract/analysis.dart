@@ -45,9 +45,9 @@ class ScreenAnchors {
   final List<String> anchors;
 
   factory ScreenAnchors.fromJson(Map<String, dynamic> j) => ScreenAnchors(
-        screenId: j['screenId'] as String,
-        anchors: (j['anchors'] as List).cast<String>(),
-      );
+    screenId: j['screenId'] as String,
+    anchors: (j['anchors'] as List).cast<String>(),
+  );
 
   Map<String, dynamic> toJson() => {'screenId': screenId, 'anchors': anchors};
 }
@@ -60,16 +60,16 @@ class GuidanceFragment {
   final List<ScreenAnchors> screens;
 
   factory GuidanceFragment.fromJson(Map<String, dynamic> j) => GuidanceFragment(
-        packageName: j['packageName'] as String,
-        screens: (j['screens'] as List)
-            .map((e) => ScreenAnchors.fromJson(_map(e)))
-            .toList(),
-      );
+    packageName: j['packageName'] as String,
+    screens: (j['screens'] as List)
+        .map((e) => ScreenAnchors.fromJson(_map(e)))
+        .toList(),
+  );
 
   Map<String, dynamic> toJson() => {
-        'packageName': packageName,
-        'screens': screens.map((s) => s.toJson()).toList(),
-      };
+    'packageName': packageName,
+    'screens': screens.map((s) => s.toJson()).toList(),
+  };
 }
 
 /// 이번 단계에서 찾을 대상. 기능을 고르기 전 첫 분석에서는 보내지 않는다.
@@ -86,13 +86,16 @@ class TargetRequest {
   final String selector;
 
   factory TargetRequest.fromJson(Map<String, dynamic> j) => TargetRequest(
-        actionId: j['actionId'] as String,
-        stepIndex: _int(j['stepIndex']),
-        selector: j['selector'] as String,
-      );
+    actionId: j['actionId'] as String,
+    stepIndex: _int(j['stepIndex']),
+    selector: j['selector'] as String,
+  );
 
-  Map<String, dynamic> toJson() =>
-      {'actionId': actionId, 'stepIndex': stepIndex, 'selector': selector};
+  Map<String, dynamic> toJson() => {
+    'actionId': actionId,
+    'stepIndex': stepIndex,
+    'selector': selector,
+  };
 }
 
 class AnalyzeRequest {
@@ -109,21 +112,21 @@ class AnalyzeRequest {
   final TargetRequest? target;
 
   factory AnalyzeRequest.fromJson(Map<String, dynamic> j) => AnalyzeRequest(
-        requestId: j['requestId'] as String,
-        imagePath: j['imagePath'] as String,
-        guidance: GuidanceFragment.fromJson(_map(j['guidance'])),
-        target: j['target'] == null
-            ? null
-            : TargetRequest.fromJson(_map(j['target'])),
-      );
+    requestId: j['requestId'] as String,
+    imagePath: j['imagePath'] as String,
+    guidance: GuidanceFragment.fromJson(_map(j['guidance'])),
+    target: j['target'] == null
+        ? null
+        : TargetRequest.fromJson(_map(j['target'])),
+  );
 
   /// target이 없으면 키 자체를 빼고 보낸다.
   Map<String, dynamic> toJson() => {
-        'requestId': requestId,
-        'imagePath': imagePath,
-        'guidance': guidance.toJson(),
-        if (target != null) 'target': target!.toJson(),
-      };
+    'requestId': requestId,
+    'imagePath': imagePath,
+    'guidance': guidance.toJson(),
+    if (target != null) 'target': target!.toJson(),
+  };
 }
 
 // ───────────────────────────── 응답 (Kotlin → Flutter) ─────────────────────────────
@@ -143,27 +146,36 @@ class UiElement {
   final String label;
   final Box box;
 
-  factory UiElement.fromJson(Map<String, dynamic> j) =>
-      UiElement(label: j['label'] as String, box: Box.fromJson(j['box'] as List));
+  factory UiElement.fromJson(Map<String, dynamic> j) => UiElement(
+    label: j['label'] as String,
+    box: Box.fromJson(j['box'] as List),
+  );
 
   Map<String, dynamic> toJson() => {'label': label, 'box': box.toJson()};
 }
 
 class TargetMatch {
-  const TargetMatch({required this.label, required this.box, required this.match});
+  const TargetMatch({
+    required this.label,
+    required this.box,
+    required this.match,
+  });
 
   final String label;
   final Box box;
   final MatchKind match;
 
   factory TargetMatch.fromJson(Map<String, dynamic> j) => TargetMatch(
-        label: j['label'] as String,
-        box: Box.fromJson(j['box'] as List),
-        match: MatchKind.values.byName(j['match'] as String),
-      );
+    label: j['label'] as String,
+    box: Box.fromJson(j['box'] as List),
+    match: MatchKind.values.byName(j['match'] as String),
+  );
 
-  Map<String, dynamic> toJson() =>
-      {'label': label, 'box': box.toJson(), 'match': match.name};
+  Map<String, dynamic> toJson() => {
+    'label': label,
+    'box': box.toJson(),
+    'match': match.name,
+  };
 }
 
 /// 개인정보 후보. 원문은 오지 않고 가린 값(앞 3자·뒤 2자)만 온다.
@@ -182,13 +194,16 @@ class PiiCandidate {
   final int elementIndex;
 
   factory PiiCandidate.fromJson(Map<String, dynamic> j) => PiiCandidate(
-        type: j['type'] as String,
-        masked: j['masked'] as String,
-        elementIndex: _int(j['elementIndex']),
-      );
+    type: j['type'] as String,
+    masked: j['masked'] as String,
+    elementIndex: _int(j['elementIndex']),
+  );
 
-  Map<String, dynamic> toJson() =>
-      {'type': type, 'masked': masked, 'elementIndex': elementIndex};
+  Map<String, dynamic> toJson() => {
+    'type': type,
+    'masked': masked,
+    'elementIndex': elementIndex,
+  };
 }
 
 enum EngineStatus { ok, failed }
@@ -202,9 +217,9 @@ class PiiEngine {
   final EngineStatus mlkit;
 
   factory PiiEngine.fromJson(Map<String, dynamic> j) => PiiEngine(
-        regex: EngineStatus.values.byName(j['regex'] as String),
-        mlkit: EngineStatus.values.byName(j['mlkit'] as String),
-      );
+    regex: EngineStatus.values.byName(j['regex'] as String),
+    mlkit: EngineStatus.values.byName(j['mlkit'] as String),
+  );
 
   Map<String, dynamic> toJson() => {'regex': regex.name, 'mlkit': mlkit.name};
 }
@@ -227,17 +242,17 @@ class AnalysisResult {
 
   /// Kotlin 쪽 실패를 Flutter에서 같은 모양으로 다루기 위한 생성자.
   const AnalysisResult.error(this.requestId, ErrorCode code)
-      : ok = false,
-        errorCode = code,
-        imageWidth = 0,
-        imageHeight = 0,
-        screenId = null,
-        elements = const [],
-        target = null,
-        pii = const [],
-        piiEngine = null,
-        ocrMs = 0,
-        totalMs = 0;
+    : ok = false,
+      errorCode = code,
+      imageWidth = 0,
+      imageHeight = 0,
+      screenId = null,
+      elements = const [],
+      target = null,
+      pii = const [],
+      piiEngine = null,
+      ocrMs = 0,
+      totalMs = 0;
 
   final String requestId;
 
@@ -262,36 +277,41 @@ class AnalysisResult {
     return AnalysisResult(
       requestId: j['requestId'] as String,
       ok: j['status'] == 'ok',
-      errorCode:
-          j['errorCode'] == null ? null : ErrorCode.fromWire(j['errorCode'] as String),
+      errorCode: j['errorCode'] == null
+          ? null
+          : ErrorCode.fromWire(j['errorCode'] as String),
       imageWidth: size == null ? 0 : _int(size['w']),
       imageHeight: size == null ? 0 : _int(size['h']),
       screenId: j['screenId'] as String?,
       elements: ((j['elements'] as List?) ?? const [])
           .map((e) => UiElement.fromJson(_map(e)))
           .toList(),
-      target: j['target'] == null ? null : TargetMatch.fromJson(_map(j['target'])),
+      target: j['target'] == null
+          ? null
+          : TargetMatch.fromJson(_map(j['target'])),
       pii: ((j['pii'] as List?) ?? const [])
           .map((e) => PiiCandidate.fromJson(_map(e)))
           .toList(),
-      piiEngine: j['piiEngine'] == null ? null : PiiEngine.fromJson(_map(j['piiEngine'])),
+      piiEngine: j['piiEngine'] == null
+          ? null
+          : PiiEngine.fromJson(_map(j['piiEngine'])),
       ocrMs: timing == null ? 0 : _int(timing['ocr']),
       totalMs: timing == null ? 0 : _int(timing['total']),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'requestId': requestId,
-        'status': ok ? 'ok' : 'error',
-        'errorCode': errorCode?.wire,
-        'imageSize': {'w': imageWidth, 'h': imageHeight},
-        'screenId': screenId,
-        'elements': elements.map((e) => e.toJson()).toList(),
-        'target': target?.toJson(),
-        'pii': pii.map((p) => p.toJson()).toList(),
-        'piiEngine': piiEngine?.toJson(),
-        'timingMs': {'ocr': ocrMs, 'total': totalMs},
-      };
+    'requestId': requestId,
+    'status': ok ? 'ok' : 'error',
+    'errorCode': errorCode?.wire,
+    'imageSize': {'w': imageWidth, 'h': imageHeight},
+    'screenId': screenId,
+    'elements': elements.map((e) => e.toJson()).toList(),
+    'target': target?.toJson(),
+    'pii': pii.map((p) => p.toJson()).toList(),
+    'piiEngine': piiEngine?.toJson(),
+    'timingMs': {'ocr': ocrMs, 'total': totalMs},
+  };
 }
 
 // MethodChannel은 Map<Object?, Object?>로 넘어오므로 키를 String으로 맞춘다.

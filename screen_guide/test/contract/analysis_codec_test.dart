@@ -75,14 +75,17 @@ void main() {
       expect(res.toJson(), json);
     });
 
-    test('screenId·target이 null이면 null로 읽는다 (UNKNOWN_SCREEN·NO_TARGET 판단 근거)', () {
-      final json = jsonDecode(contractResponse) as Map<String, dynamic>
-        ..['screenId'] = null
-        ..['target'] = null;
-      final res = AnalysisResult.fromJson(json);
-      expect(res.screenId, isNull);
-      expect(res.target, isNull);
-    });
+    test(
+      'screenId·target이 null이면 null로 읽는다 (UNKNOWN_SCREEN·NO_TARGET 판단 근거)',
+      () {
+        final json = jsonDecode(contractResponse) as Map<String, dynamic>
+          ..['screenId'] = null
+          ..['target'] = null;
+        final res = AnalysisResult.fromJson(json);
+        expect(res.screenId, isNull);
+        expect(res.target, isNull);
+      },
+    );
 
     test('오류 응답의 errorCode를 코드로 바꾼다', () {
       final res = AnalysisResult.fromJson({
@@ -101,7 +104,10 @@ void main() {
         'status': 'ok',
         'imageSize': <Object?, Object?>{'w': 1080.0, 'h': 2340},
         'elements': [
-          <Object?, Object?>{'label': '앱', 'box': [1.0, 2, 3, 4]},
+          <Object?, Object?>{
+            'label': '앱',
+            'box': [1.0, 2, 3, 4],
+          },
         ],
       };
       final res = AnalysisResult.fromJson(Map<String, dynamic>.from(raw));

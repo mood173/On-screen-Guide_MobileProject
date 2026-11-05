@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'bootstrap.dart';
 import 'contract/analysis.dart';
+import 'ui/theme/app_theme.dart';
 
 void main() {
   runApp(ScreenGuideApp(deps: bootstrap()));
@@ -16,7 +17,7 @@ class ScreenGuideApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '화면길잡이',
-      theme: ThemeData(colorSchemeSeed: Colors.blue, useMaterial3: true),
+      theme: AppTheme.light(),
       home: SkeletonHome(deps: deps),
     );
   }
@@ -62,8 +63,8 @@ class _SkeletonHomeState extends State<SkeletonHome> {
       _busy = false;
       _summary = r.ok
           ? '화면: ${r.screenId ?? "미식별"}\n'
-              '요소 ${r.elements.length}개 · 대상: ${r.target?.label ?? "없음"}\n'
-              '개인정보 후보 ${r.pii.length}건 · ${r.totalMs}ms'
+                '요소 ${r.elements.length}개 · 대상: ${r.target?.label ?? "없음"}\n'
+                '개인정보 후보 ${r.pii.length}건 · ${r.totalMs}ms'
           : '오류: ${r.errorCode?.wire}';
     });
   }

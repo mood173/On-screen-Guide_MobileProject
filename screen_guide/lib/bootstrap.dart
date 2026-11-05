@@ -4,7 +4,10 @@ import 'domain/screen_analyzer.dart';
 
 /// 실행 시 `--dart-define=FAKE_ANALYZER=false`를 주면 실제 Kotlin 분석기를 쓴다.
 /// 기본값은 가짜 분석기: Kotlin 채널이 계약 v1 응답 형식으로 바뀌기 전까지 화면 작업은 가짜로 한다.
-const bool useFakeAnalyzer = bool.fromEnvironment('FAKE_ANALYZER', defaultValue: true);
+const bool useFakeAnalyzer = bool.fromEnvironment(
+  'FAKE_ANALYZER',
+  defaultValue: true,
+);
 
 /// 앱 전체에서 쓰는 구현체 묶음. (개발 계약 v1 · 결정 3: 외부 DI 패키지 없이 생성자 주입)
 ///

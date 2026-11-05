@@ -40,14 +40,20 @@ class FakeAnalyzer implements ScreenAnalyzer {
   @override
   Future<AnalysisResult> analyze(AnalyzeRequest request) async {
     await Future<void>.delayed(delay);
-    if (failWith != null) return AnalysisResult.error(request.requestId, failWith!);
+    if (failWith != null) {
+      return AnalysisResult.error(request.requestId, failWith!);
+    }
 
     TargetMatch? target;
     final selector = request.target?.selector;
     if (selector != null) {
       for (final e in sampleElements) {
         if (e.label == selector) {
-          target = TargetMatch(label: e.label, box: e.box, match: MatchKind.exact);
+          target = TargetMatch(
+            label: e.label,
+            box: e.box,
+            match: MatchKind.exact,
+          );
           break;
         }
       }
@@ -64,7 +70,10 @@ class FakeAnalyzer implements ScreenAnalyzer {
       pii: const [
         PiiCandidate(type: '휴대전화', masked: '010-****-**78', elementIndex: 7),
       ],
-      piiEngine: const PiiEngine(regex: EngineStatus.ok, mlkit: EngineStatus.ok),
+      piiEngine: const PiiEngine(
+        regex: EngineStatus.ok,
+        mlkit: EngineStatus.ok,
+      ),
       ocrMs: delay.inMilliseconds,
       totalMs: delay.inMilliseconds,
     );

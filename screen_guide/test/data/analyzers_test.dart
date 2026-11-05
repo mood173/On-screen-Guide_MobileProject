@@ -7,17 +7,23 @@ import 'package:screen_guide/data/method_channel_analyzer.dart';
 
 const _guidance = GuidanceFragment(
   packageName: 'com.android.settings',
-  screens: [ScreenAnchors(screenId: 'settings', anchors: ['설정', '알림 설정'])],
+  screens: [
+    ScreenAnchors(screenId: 'settings', anchors: ['설정', '알림 설정']),
+  ],
 );
 
 AnalyzeRequest _req({String? selector}) => AnalyzeRequest(
-      requestId: 'req-1',
-      imagePath: '/tmp/img.jpg',
-      guidance: _guidance,
-      target: selector == null
-          ? null
-          : TargetRequest(actionId: 'settings.notification', stepIndex: 0, selector: selector),
-    );
+  requestId: 'req-1',
+  imagePath: '/tmp/img.jpg',
+  guidance: _guidance,
+  target: selector == null
+      ? null
+      : TargetRequest(
+          actionId: 'settings.notification',
+          stepIndex: 0,
+          selector: selector,
+        ),
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -55,15 +61,20 @@ void main() {
       final r = await fake.analyze(_req());
       for (var i = 1; i < r.elements.length; i++) {
         final a = r.elements[i - 1].box, b = r.elements[i].box;
-        expect(a.top < b.top || (a.top == b.top && a.left <= b.left), isTrue,
-            reason: '${r.elements[i - 1].label} → ${r.elements[i].label}');
+        expect(
+          a.top < b.top || (a.top == b.top && a.left <= b.left),
+          isTrue,
+          reason: '${r.elements[i - 1].label} → ${r.elements[i].label}',
+        );
       }
       expect(r.elements.every((e) => e.label.trim().isNotEmpty), isTrue);
     });
 
     test('failWith로 오류를 낸다', () async {
-      final r = await FakeAnalyzer(delay: Duration.zero, failWith: ErrorCode.imageReadFailed)
-          .analyze(_req());
+      final r = await FakeAnalyzer(
+        delay: Duration.zero,
+        failWith: ErrorCode.imageReadFailed,
+      ).analyze(_req());
       expect(r.ok, isFalse);
       expect(r.errorCode, ErrorCode.imageReadFailed);
     });
@@ -87,9 +98,16 @@ void main() {
           'imageSize': {'w': 1080, 'h': 2340},
           'screenId': 'settings',
           'elements': [
-            {'label': '알림 설정', 'box': [174, 1029, 341, 1070]},
+            {
+              'label': '알림 설정',
+              'box': [174, 1029, 341, 1070],
+            },
           ],
-          'target': {'label': '알림 설정', 'box': [174, 1029, 341, 1070], 'match': 'fuzzy'},
+          'target': {
+            'label': '알림 설정',
+            'box': [174, 1029, 341, 1070],
+            'match': 'fuzzy',
+          },
           'pii': [],
           'piiEngine': {'regex': 'ok', 'mlkit': 'failed'},
           'timingMs': {'ocr': 900, 'total': 950},
