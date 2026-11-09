@@ -21,4 +21,4 @@ Android 기기에서 확인해야 하는 경로: 카메라 촬영, 갤러리 선
 
 ## 제출 준비
 
-`screenshots/`에 실기기 또는 에뮬레이터에서 촬영한 이미지 표시 화면, 카메라 권한 요청 대화상자, 권한 거부 안내 화면을 각각 저장해야 합니다. 실제 촬영 전에는 제출용 캡처가 준비되지 않은 상태입니다. `prompts_log.md`에 이번 제작 요청과 반영 내역을 기록했습니다. ZIP을 만들 때 `app/`(이 Flutter 프로젝트 소스), `README.md`, `screenshots/`, `prompts_log.md`가 최상위에 오도록 정리하고 `.env`, `.dart_tool`, `build`는 제외합니다.
+`screenshots/`에는 Android 에뮬레이터에서 직접 캡처한 카메라 권한 요청, 권한 거부 안내, 갤러리 이미지 표시, 가상 카메라 촬영 이미지 표시 화면을 넣었습니다. 실제 휴대전화 촬영 품질은 별도 확인이 필요합니다. `prompts_log.md`에 이번 제작 요청과 반영 내역을 기록했습니다. ZIP 최상위에는 `app/`(이 Flutter 프로젝트 소스), `README.md`, `screenshots/`, `prompts_log.md`를 두고 `.env`, `.dart_tool`, `build`, `.gradle`은 제외합니다.

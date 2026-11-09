@@ -71,9 +71,19 @@ class _HomePageState extends State<HomePage> {
         source: source,
         requestFullMetadata: false,
       );
+      assert(() {
+        debugPrint(
+          '[Stage1] ${source.name} picker: ${file == null ? 'canceled' : 'file returned'}',
+        );
+        return true;
+      }());
       if (file == null || !mounted) return; // 시스템 화면에서 사용자가 취소
       await _showPreview(file, source);
     } on PlatformException catch (e) {
+      assert(() {
+        debugPrint('[Stage1] picker error: ${e.code}');
+        return true;
+      }());
       _handlePickerError(e);
     } catch (_) {
       if (mounted) _showError('이미지를 가져오지 못했어요. 다시 시도해 주세요.');
