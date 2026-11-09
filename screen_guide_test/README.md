@@ -1,17 +1,24 @@
-# screen_guide_test
+# 화면길잡이 · 사진 인식 앱 1단계
 
-A new Flutter project.
+Flutter로 만든 Android 이미지 입력 앱입니다. 카메라 촬영과 갤러리 선택 중 하나로 이미지 한 장을 가져와 미리보기와 표시 화면을 제공합니다. 기존의 온디바이스 OCR 시험 코드는 `lib/legacy_analysis.dart`와 Android Kotlin 코드에 보존되어 있으며, 1단계 화면에서는 호출하지 않습니다.
 
-## Getting Started
+## 실행
 
-This project is a starting point for a Flutter application.
+1. Flutter와 Android SDK가 설치된 환경에서 Android 기기 또는 에뮬레이터를 연결합니다.
+2. 이 폴더에서 `flutter pub get`을 실행합니다.
+3. `flutter run`으로 앱을 실행합니다.
+4. 홈에서 **카메라로 촬영** 또는 **갤러리에서 선택**을 누릅니다.
+5. 미리보기에서 **선택한 이미지 사용**을 누르면 이미지 표시 화면이 나옵니다.
 
-A few resources to get you started if this is your first Flutter project:
+Android 기기에서 확인해야 하는 경로: 카메라 촬영, 갤러리 선택, 카메라 권한 요청 후 거부, 시스템 카메라·사진 선택기에서 취소, 손상되거나 읽을 수 없는 이미지. 카메라 권한을 거부하면 안내 화면에서 앱 권한 설정을 열거나 갤러리로 전환할 수 있습니다.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## 권한과 예외 처리
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- 카메라 기능은 `image_picker`가 시스템 카메라 앱을 열어 촬영합니다. Android manifest에 `CAMERA`를 선언해 촬영 시 권한을 요청합니다. 거부되면 앱은 종료되지 않고 안내 화면을 보여 줍니다.
+- 갤러리는 시스템 사진 선택기를 사용합니다. 전체 사진·저장소 권한을 요청하지 않으며 이미지 한 장만 선택합니다. 위치 등 추가 메타데이터를 요청하지 않습니다.
+- 선택 화면에서 취소하면 현재 화면에 머뭅니다. 파일이 없거나 비어 있으면 오류 안내를 보여 줍니다. 이미지 디코딩 오류는 이미지 자리에서 안내합니다.
+- 앱은 이미지를 서버로 전송하지 않습니다. 촬영·선택된 파일은 플러그인이 제공하는 임시 경로에 있을 수 있으므로 장기 보관 파일로 간주하지 않습니다. 사용자의 갤러리 원본은 삭제하지 않습니다.
+
+## 제출 준비
+
+`screenshots/`에 실기기 또는 에뮬레이터에서 촬영한 이미지 표시 화면, 카메라 권한 요청 대화상자, 권한 거부 안내 화면을 각각 저장해야 합니다. 실제 촬영 전에는 제출용 캡처가 준비되지 않은 상태입니다. `prompts_log.md`에 이번 제작 요청과 반영 내역을 기록했습니다. ZIP을 만들 때 `app/`(이 Flutter 프로젝트 소스), `README.md`, `screenshots/`, `prompts_log.md`가 최상위에 오도록 정리하고 `.env`, `.dart_tool`, `build`는 제외합니다.
