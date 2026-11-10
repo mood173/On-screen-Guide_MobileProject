@@ -1,0 +1,11 @@
+{
+  "requestId": "r1",
+  "imagePath": "/data/user/0/com.screenguide.screen_guide/code_cache/sg_X/sample_settings.png",
+  "guidance": {
+    "packageName": "demo.screen_guide",
+    "screens": [
+      { "screenId": "settings", "anchors": ["설정", "알림 설정", "배터리", "디스플레이"] },
+      { "screenId": "chat", "anchors": ["대화", "메시지 입력", "보내기"] }
+    ]
+  }
+}

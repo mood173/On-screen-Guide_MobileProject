@@ -1,0 +1,12 @@
+{
+  "requestId": "r4",
+  "status": "ok",
+  "errorCode": null,
+  "imageSize": { "w": 1080, "h": 2340 },
+  "screenId": null,
+  "elements": [ { "label": "알 수 없는 화면", "box": [10, 10, 300, 60] } ],
+  "target": null,
+  "pii": [],
+  "piiEngine": { "regex": "ok", "mlkit": "ok" },
+  "timingMs": { "ocr": 500, "total": 520 }
+}

@@ -6,6 +6,8 @@ import 'package:screen_guide/core/flow_state.dart';
 import 'package:screen_guide/core/screen_id.dart';
 import 'package:screen_guide/data/demo_guidance.dart';
 import 'package:screen_guide/data/fake_analyzer.dart';
+import 'package:screen_guide/data/fakes.dart';
+import 'package:screen_guide/domain/guidance.dart';
 import 'package:screen_guide/data/image_files.dart';
 import 'package:screen_guide/data/sample_images.dart';
 import 'package:screen_guide/domain/screen_analyzer.dart';
@@ -35,6 +37,25 @@ class _HoldAnalyzer implements ScreenAnalyzer {
   }
 
   int get pending => _done.length;
+}
+
+class _OneActionRepo implements GuidanceRepository {
+  @override
+  Future<GuidanceFragment> fragment() async => DemoGuidance.fragment;
+  @override
+  Future<List<GuideAction>> actionsFor(String screenId) async => const [
+    GuideAction(
+      actionId: 'settings.battery',
+      screenId: 'settings',
+      title: '배터리 확인',
+      description: '배터리 사용량을 봐요',
+      steps: [
+        GuideStep(selector: '배터리', instruction: '배터리를 눌러주세요', result: ''),
+      ],
+    ),
+  ];
+  @override
+  Future<String> activeRevision() async => 't';
 }
 
 class _RecordingFiles implements ImageFiles {
@@ -178,6 +199,47 @@ void main() {
 
     await f.dispatch(ActionId.navHome);
     expect(files.released, ['/cache/sg_1/sample_chat.png']);
+  });
+
+  test('완료 화면에서 안내 기록 저장 → HistoryRepository에 원문 없이 저장된다', () async {
+    final history = InMemoryHistoryRepository();
+    final f = GuideFlow(
+      analyzer: FakeAnalyzer(delay: Duration.zero),
+      history: history,
+    );
+    await f.dispatch(ActionId.captureGallery);
+    await f.dispatch(ActionId.captureGallery, SampleImage.chat);
+    await f.dispatch(ActionId.captureGallery);
+    await f.dispatch(ActionId.analyzeRun);
+    final send = f.availableActions.single;
+    await f.dispatch(ActionId.guideStart, send);
+    await f.dispatch(ActionId.guideNext);
+    await f.dispatch(ActionId.guideNext);
+    expect(f.screen, ScreenId.done);
+
+    await f.dispatch(ActionId.historySave);
+    final saved = (await f.historyList()).single;
+    expect(saved.actionId, 'chat.send');
+    expect(saved.stepInstructions, hasLength(2));
+    expect(saved.piiTypes, hasLength(5));
+    expect(
+      saved.piiTypes.join(),
+      isNot(contains('010')),
+      reason: '유형 이름만, 가린 값·원문 없음',
+    );
+    expect(f.notice, '안내 기록에 저장했어요');
+  });
+
+  test('기능 목록은 GuidanceRepository에서 온다', () async {
+    final f = GuideFlow(
+      analyzer: FakeAnalyzer(delay: Duration.zero),
+      guidance: _OneActionRepo(),
+    );
+    await f.dispatch(ActionId.captureGallery);
+    await f.dispatch(ActionId.captureGallery, SampleImage.settings);
+    await f.dispatch(ActionId.captureGallery);
+    await f.dispatch(ActionId.analyzeRun);
+    expect(f.availableActions.map((a) => a.actionId), ['settings.battery']);
   });
 
   test('준비 중인 기능은 안내 문구만 남긴다', () async {

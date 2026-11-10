@@ -1,4 +1,4 @@
-// 생성자 인자 이름은 공개(analyzer, files), 필드는 비공개로 두려고 initializing formal을 쓰지 않는다.
+// 생성자 인자 이름은 공개(analyzer, guidance …), 필드는 비공개로 두려고 initializing formal을 쓰지 않는다.
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
@@ -11,9 +11,14 @@ import '../core/error_code.dart';
 import '../core/flow_state.dart';
 import '../core/screen_id.dart';
 import '../data/demo_guidance.dart';
+import '../data/fakes.dart';
 import '../data/image_files.dart';
 import '../data/sample_images.dart';
+import '../domain/guidance.dart';
+import '../domain/history.dart';
+import '../domain/image_input.dart';
 import '../domain/screen_analyzer.dart';
+import '../domain/share_and_update.dart';
 
 /// 흐름 관리자 (설계 6.1 4층 런타임·관문 + 5층 기능).
 ///
@@ -22,13 +27,35 @@ import '../domain/screen_analyzer.dart';
 class GuideFlow extends ChangeNotifier {
   GuideFlow({
     required ScreenAnalyzer analyzer,
+    GuidanceRepository guidance = const DemoGuidanceRepository(),
+    HistoryRepository? history,
     ImageFiles files = const AssetPathImageFiles(),
+    ImageInput? imageInput,
+    Sharer? sharer,
+    MapUpdater? mapUpdater,
     this.slowAfter = const Duration(seconds: 3),
   }) : _analyzer = analyzer,
-       _files = files;
+       _guidance = guidance,
+       _history = history ?? InMemoryHistoryRepository(),
+       _files = files,
+       imageInput = imageInput ?? FakeImageInput(files: files),
+       sharer = sharer ?? FakeSharer(),
+       mapUpdater = mapUpdater ?? FakeMapUpdater();
 
-  final ScreenAnalyzer _analyzer;
-  final ImageFiles _files;
+  // ── 연결 지점 (포트). 구현은 bootstrap.dart가 고른다. ──
+  final ScreenAnalyzer _analyzer; // 팀원 1 (Kotlin 채널)
+  final GuidanceRepository _guidance; // 팀원 3 (기능 맵)
+  final HistoryRepository _history; // 팀원 3 (이력)
+  final ImageFiles _files; // 체험용 샘플 → 파일 경로
+
+  /// 팀원 3 (image_picker). 2주차 카메라·실제 갤러리 화면에서 사용.
+  final ImageInput imageInput;
+
+  /// 팀원 3 (share_plus). 2~3주차 P → SHARE 화면에서 사용.
+  final Sharer sharer;
+
+  /// 팀원 3 (Firebase B01/B02). 4주차 앱 시작 시 mapCheck에서 사용.
+  final MapUpdater mapUpdater;
 
   /// 분석 요청에 넣는 파일 경로 (앱 캐시에 만든 복사본)
   String? _imagePath;
@@ -68,8 +95,8 @@ class GuideFlow extends ChangeNotifier {
   int _seq = 0;
   Timer? _slowTimer;
 
-  List<GuideAction> get availableActions =>
-      DemoGuidance.forScreen(result?.screenId);
+  /// 식별된 화면에서 고를 수 있는 기능 (GuidanceRepository.actionsFor 결과)
+  List<GuideAction> availableActions = const [];
   int get totalSteps => action?.steps.length ?? 0;
   GuideStep? get currentStep => action?.steps[step];
 
@@ -149,6 +176,8 @@ class GuideFlow extends ChangeNotifier {
         _back();
       case ActionId.navHome:
         _reset();
+      case ActionId.historySave:
+        await _saveHistory();
       default:
         notice = '이 기능은 아직 준비 중이에요';
     }
@@ -178,26 +207,30 @@ class GuideFlow extends ChangeNotifier {
     if (p != null) _files.release(p);
   }
 
-  AnalyzeRequest _request({TargetRequest? target}) => AnalyzeRequest(
-    requestId: 'r${++_seq}',
-    imagePath: _imagePath ?? picked!.asset,
-    guidance: DemoGuidance.fragment,
-    target: target,
-  );
-
-  Future<AnalysisResult?> _run(AnalyzeRequest req) async {
-    _pendingId = req.requestId;
+  /// 분석 요청 한 번. 요청 번호를 **맨 먼저** 정해 두어서, 기능 맵을 읽는 중이든 분석 중이든
+  /// 취소·새 요청이 생기면 그 뒤의 응답은 버린다 (계약 v1 결정 3: Flutter가 requestId를 버림).
+  /// 버린 경우 null.
+  Future<AnalysisResult?> _analyze({TargetRequest? target}) async {
+    final id = 'r${++_seq}';
+    _pendingId = id;
     slow = false;
     _slowTimer?.cancel();
     _slowTimer = Timer(slowAfter, () {
-      if (_pendingId == req.requestId) {
+      if (_pendingId == id) {
         slow = true;
         notifyListeners();
       }
     });
+    final req = AnalyzeRequest(
+      requestId: id,
+      imagePath: _imagePath ?? picked!.asset,
+      guidance: await _guidance.fragment(),
+      target: target,
+    );
+    if (_pendingId != id) return null; // 맵을 읽는 사이에 취소됨
     final r = await _analyzer.analyze(req);
+    if (_pendingId != id) return null; // 분석 중에 취소됐거나 더 새 요청이 있음
     _slowTimer?.cancel();
-    if (_pendingId != req.requestId) return null; // 취소됐거나 더 새 요청이 있음 → 응답 버림
     _pendingId = null;
     slow = false;
     return r;
@@ -207,11 +240,12 @@ class GuideFlow extends ChangeNotifier {
     if (picked == null) return;
     _go(ScreenId.ga, FlowState.analyzing);
     notifyListeners();
-    final r = await _run(_request());
+    final r = await _analyze();
     if (r == null) return;
     if (!r.ok) return _fail(r.errorCode ?? ErrorCode.analysisFailed);
     if (r.screenId == null) return _fail(ErrorCode.unknownScreen);
     result = r;
+    availableActions = await _guidance.actionsFor(r.screenId!);
     _go(ScreenId.rg, FlowState.identified);
   }
 
@@ -236,13 +270,11 @@ class GuideFlow extends ChangeNotifier {
     target = null;
     locating = true;
     notifyListeners();
-    final r = await _run(
-      _request(
-        target: TargetRequest(
-          actionId: action!.actionId,
-          stepIndex: step,
-          selector: s.selector,
-        ),
+    final r = await _analyze(
+      target: TargetRequest(
+        actionId: action!.actionId,
+        stepIndex: step,
+        selector: s.selector,
       ),
     );
     locating = false;
@@ -260,6 +292,32 @@ class GuideFlow extends ChangeNotifier {
       _go(ScreenId.done, FlowState.done);
     }
   }
+
+  /// 안내 기록 저장. 원본·OCR 원문·후보 원문은 넣지 않는다.
+  Future<void> _saveHistory() async {
+    final a = action;
+    if (a == null) {
+      notice = '기능을 골라 안내를 받은 뒤 저장할 수 있어요';
+      return;
+    }
+    await _history.save(
+      HistoryEntry(
+        id: 'h${DateTime.now().microsecondsSinceEpoch}',
+        actionId: a.actionId,
+        actionTitle: a.title,
+        stepInstructions: [for (final s in a.steps) s.instruction],
+        input: 'sample',
+        createdAt: DateTime.now(),
+        piiTypes: [
+          for (final p in result?.pii ?? const <PiiCandidate>[]) p.type,
+        ],
+      ),
+    );
+    notice = '안내 기록에 저장했어요';
+  }
+
+  /// HISTORY 화면이 읽는다 (3주차).
+  Future<List<HistoryEntry>> historyList() => _history.list();
 
   void _fail(ErrorCode code) {
     error = code;
@@ -304,6 +362,7 @@ class GuideFlow extends ChangeNotifier {
     picked = null;
     _releaseFile(); // 앱이 만든 복사본 정리
     result = null;
+    availableActions = const [];
     action = null;
     step = 0;
     target = null;

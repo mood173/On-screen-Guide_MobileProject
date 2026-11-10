@@ -1,44 +1,26 @@
-// 체험용 기능 맵. 데이터 담당의 기능 맵 스키마·GuidanceRepository가 들어오면 이 파일을 교체한다.
+// 체험용 기능 맵. 팀원 3의 로컬 DB 구현(GuidanceRepository)이 들어오면 bootstrap에서 교체한다.
 //
 // 형식은 기능·개념 정리 9.2의 guidance_maps(screen_id, screen_anchors, action_id, utterances, selectors, steps)를
 // 화면에 필요한 만큼만 줄인 것이다.
 
 import '../contract/analysis.dart';
+import '../domain/guidance.dart';
 
-class GuideStep {
-  const GuideStep({
-    required this.selector,
-    required this.instruction,
-    required this.result,
-  });
+export '../domain/guidance.dart' show GuideAction, GuideStep;
 
-  /// 이 단계에서 누를 UI의 글자 (Kotlin 대상 찾기에 넘김)
-  final String selector;
+/// 체험용 [GuidanceRepository] 구현.
+class DemoGuidanceRepository implements GuidanceRepository {
+  const DemoGuidanceRepository();
 
-  /// 안내 카드 제목 ("알림 설정을 눌러주세요")
-  final String instruction;
+  @override
+  Future<GuidanceFragment> fragment() async => DemoGuidance.fragment;
 
-  /// 누르면 일어나는 일 (안내 카드 보조 문구)
-  final String result;
-}
+  @override
+  Future<List<GuideAction>> actionsFor(String screenId) async =>
+      DemoGuidance.forScreen(screenId);
 
-class GuideAction {
-  const GuideAction({
-    required this.actionId,
-    required this.screenId,
-    required this.title,
-    required this.description,
-    required this.steps,
-  });
-
-  /// 앱 기능 ID (영역.동작)
-  final String actionId;
-
-  /// 이 기능을 시작할 수 있는 화면
-  final String screenId;
-  final String title;
-  final String description;
-  final List<GuideStep> steps;
+  @override
+  Future<String> activeRevision() async => 'demo';
 }
 
 abstract final class DemoGuidance {

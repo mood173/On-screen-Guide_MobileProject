@@ -1,0 +1,12 @@
+{
+  "requestId": "r5",
+  "status": "error",
+  "errorCode": "IMAGE_READ_FAILED",
+  "imageSize": null,
+  "screenId": null,
+  "elements": [],
+  "target": null,
+  "pii": [],
+  "piiEngine": null,
+  "timingMs": null
+}
