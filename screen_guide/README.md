@@ -77,6 +77,8 @@ android/app/src/main/kotlin/com/screenguide/screen_guide/   ← 강민준
 
 폴더 구조와 소유는 Notion「화면길잡이_협업규격_최종」2장 기준이다. 의존 규칙: 기능 안에서 ui·data는 domain만 보고,
 기능끼리는 서로의 domain과 shared/contracts만 본다. 구현 객체를 만드는 곳은 app/bootstrap.dart뿐이다.
+예외 하나: 화면(ui)은 흐름 입구 `app/guide_flow.dart`를 본다 (`flow.dispatch`·`flow.allows`·상태 읽기).
+화면이 data를 보지 않는다는 규칙은 그대로다. (11/11 결정 — 규격 2장 문장에 반영 요청)
 
 규칙: 화면 위젯은 상태를 받아 그리기만 하고, 버튼은 `flow.dispatch(ActionId.xxx)`만 부른다.
 업무 처리와 화면 전환은 `GuideFlow`가 한다.
