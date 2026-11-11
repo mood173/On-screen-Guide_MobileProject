@@ -52,14 +52,13 @@ class Analyzer(private val context: Context) {
                 val target = req.selector?.let { findTarget(elements, it) }
                 val fullText = joinLabels(elements)
 
-                Log.i(tag, "OCR ${tOcr}ms, lines=${elements.size}, screen=${screen?.screenId}, target=${target?.match}")
-                elements.forEach { Log.i(tag, "  [${it.box.left},${it.box.top},${it.box.right},${it.box.bottom}] ${it.label}") }
+                // 로그에는 줄 수와 시간만 남긴다. 인식한 글자·가린 값·상자 좌표는 찍지 않는다 (K10, 협업규격_최종 3.3)
+                Log.i(tag, "ocr ${tOcr}ms, lines=${elements.size}")
 
                 runEntityExtraction(fullText) { mlkit, mlkitOk -> try {
                     val pii = piiHits(elements, mlkit)
                     val total = SystemClock.elapsedRealtime() - t0
-                    Log.i(tag, "privacy=${pii.size} (mlkit ok=$mlkitOk), total ${total}ms")
-                    pii.forEach { Log.i(tag, "  ${it.type} : ${it.masked}") }
+                    Log.i(tag, "total ${total}ms")
                     onDone(ChannelCodec.encode(AnalyzeResult(
                         requestId = req.requestId, width = image.width, height = image.height,
                         screenId = screen?.screenId,
