@@ -24,6 +24,30 @@ class Analyzer(private val context: Context) {
         EntityExtractorOptions.Builder(EntityExtractorOptions.KOREAN).build())
     private val main = Handler(Looper.getMainLooper())
 
+    // MP2: 앱에 포함된 한국어 OCR 모델만 사용한다. 개체 추출 모델 다운로드는 호출하지 않는다.
+    fun analyzeOcr(path: String, onDone: (Map<String, Any?>) -> Unit, onError: (String) -> Unit) {
+        val started = SystemClock.elapsedRealtime()
+        val image = try { InputImage.fromFilePath(context, Uri.fromFile(File(path))) }
+                    catch (e: Exception) { onError("image_read_failed"); return }
+
+        recognizer.process(image)
+            .addOnSuccessListener { text ->
+                val lines = text.textBlocks.flatMap { it.lines }
+                    .map { it.text.trim() }
+                    .filter { it.isNotEmpty() }
+                val elapsed = SystemClock.elapsedRealtime() - started
+                onDone(mapOf(
+                    "status" to if (lines.isEmpty()) "no_text" else "recognized",
+                    "lines" to lines,
+                    "lineCount" to lines.size,
+                    "imageWidth" to image.width,
+                    "imageHeight" to image.height,
+                    "processingMs" to elapsed,
+                ))
+            }
+            .addOnFailureListener { onError("analysis_failed") }
+    }
+
     fun analyze(path: String, selector: String, onDone: (Map<String, Any?>) -> Unit, onError: (String) -> Unit) {
         val t0 = SystemClock.elapsedRealtime()
         val image = try { InputImage.fromFilePath(context, Uri.fromFile(File(path))) }
