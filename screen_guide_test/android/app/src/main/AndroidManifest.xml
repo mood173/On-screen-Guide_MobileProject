@@ -2,6 +2,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <application
         android:label="화면길잡이"
+        android:allowBackup="false"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
