@@ -9,6 +9,11 @@ data class UiElement(val label: String, val box: Box)
 data class GuidanceMap(val screenId: String, val screenAnchors: List<String>)
 data class Candidate(val start: Int, val end: Int, val types: List<String>)
 
+// 채널 응답에 실리는 결과 (계약 v1: target.match, pii[])
+enum class MatchKind(val wire: String) { EXACT("exact"), FUZZY("fuzzy") }
+data class TargetMatch(val element: UiElement, val match: MatchKind)
+data class PiiHit(val type: String, val masked: String, val elementIndex: Int)
+
 // ---------- F02 ----------
 fun toUiElements(lines: List<OcrLine>): List<UiElement> =
     lines
