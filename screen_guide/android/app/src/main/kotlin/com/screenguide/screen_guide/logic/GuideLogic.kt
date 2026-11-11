@@ -27,15 +27,47 @@ fun norm(s: String) = s.replace(Regex("""[\s·:]"""), "")
 fun hasAnchor(label: String, anchor: String) =
     norm(label) == norm(anchor) || label.split(Regex("""\s+""")).any { norm(it) == norm(anchor) }
 
-fun identifyScreen(elements: List<UiElement>, maps: List<GuidanceMap>): GuidanceMap? =
-    maps.firstOrNull { m -> m.screenAnchors.count { a -> elements.any { hasAnchor(it.label, a) } } >= 2 }
+// R1: 앵커 몇 개가 "서로 다른 요소"에서 보이는가. 한 요소는 앵커 하나에만 쓴다.
+// 앵커-요소 이분 그래프의 최대 짝짓기 수 (증가 경로, Kuhn). 입력이 작아(앵커 수 개 × 줄 수십 개) 단순 탐색으로 충분하다.
+// fake_analyzer.dart 의 _matched 와 같은 알고리즘.
+fun matchedAnchors(elements: List<UiElement>, anchors: List<String>): Int {
+    val owner = HashMap<Int, Int>()   // 요소 번호 → 그 요소를 쓰고 있는 앵커 번호
+    fun assign(a: Int, seen: MutableSet<Int>): Boolean {
+        for (i in elements.indices) {
+            if (i in seen || !hasAnchor(elements[i].label, anchors[a])) continue
+            seen += i
+            val prev = owner[i]
+            if (prev == null || assign(prev, seen)) { owner[i] = a; return true }
+        }
+        return false
+    }
+    return anchors.indices.count { assign(it, HashSet()) }
+}
 
-fun findTarget(elements: List<UiElement>, selector: String): UiElement? {
+// R2: 2개 이상 맞은 화면 중 맞은 수가 가장 많은 화면. 가장 많은 수가 같은 화면이 둘 이상이면 null (추정하지 않는다).
+fun identifyScreen(elements: List<UiElement>, maps: List<GuidanceMap>): GuidanceMap? {
+    var best: GuidanceMap? = null
+    var bestN = 1
+    var tie = false
+    for (m in maps) {
+        val n = matchedAnchors(elements, m.screenAnchors)
+        if (n > bestN) { best = m; bestN = n; tie = false }
+        else if (n == bestN && best != null) tie = true
+    }
+    return if (tie) null else best
+}
+
+// R3: 정확히 같은 요소가 하나일 때만 exact. 둘 이상이면 null.
+// 정확 일치가 없으면 길이가 같고 한 글자만 다른 요소가 하나일 때만 fuzzy (선택자 2자 이상). 그 밖은 null.
+fun findTarget(elements: List<UiElement>, selector: String): TargetMatch? {
     val s = norm(selector)
-    elements.firstOrNull { norm(it.label) == s }?.let { return it }
+    val exact = elements.filter { norm(it.label) == s }
+    if (exact.size == 1) return TargetMatch(exact[0], MatchKind.EXACT)
+    if (exact.size > 1) return null
     if (s.length < 2) return null
-    return elements.filter { val l = norm(it.label)
-        l.length == s.length && l.zip(s).count { (a, b) -> a != b } == 1 }.singleOrNull()
+    val near = elements.filter { val l = norm(it.label)
+        l.length == s.length && l.zip(s).count { (a, b) -> a != b } == 1 }
+    return near.singleOrNull()?.let { TargetMatch(it, MatchKind.FUZZY) }
 }
 
 // ---------- F03 ----------

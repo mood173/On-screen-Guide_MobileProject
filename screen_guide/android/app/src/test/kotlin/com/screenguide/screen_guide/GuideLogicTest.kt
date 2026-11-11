@@ -30,14 +30,14 @@ class GuideLogicTest {
         assertEquals(1, m.size); assertEquals(listOf("휴대전화"), m[0].types)
     }
     @Test fun n01_정규화() = assertEquals("알림설정", norm("알림 설정"))
-    @Test fun t01_정확일치() = assertEquals("설정", findTarget(els("설정", "알림"), "설정")?.label)
-    @Test fun t02_OCR_오인식_한글자() = assertEquals("설장", findTarget(els("설장", "알림"), "설정")?.label)
+    @Test fun t01_정확일치() = assertEquals("설정", findTarget(els("설정", "알림"), "설정")?.element?.label)
+    @Test fun t02_OCR_오인식_한글자() = assertEquals("설장", findTarget(els("설장", "알림"), "설정")?.element?.label)
     @Test fun t03_후보_2개_이상() = assertNull(findTarget(els("검샥", "감색"), "검색"))
     @Test fun t04_없음() = assertNull(findTarget(els("알림", "홈"), "결제"))
     @Test fun t05_짧은라벨_오매칭_방지() = assertNull(findTarget(els("검", "홈"), "검색"))
     @Test fun t06_한글자_선택자_오매칭_방지() = assertNull(findTarget(els("옴", "메뉴"), "홈"))
 
-    private val maps = listOf(GuidanceMap("home", listOf("홈", "내 정보")), GuidanceMap("settings", listOf("설정", "알림 설정")))
+    private val maps = listOf(GuidanceMap("home", listOf("홈", "내 정보")), GuidanceMap("settings", listOf("설정", "배터리")))
     @Test fun s01_화면식별() = assertEquals("home", identifyScreen(els("홈", "내정보", "검색"), maps)?.screenId)
     @Test fun s02_앵커_1개만() = assertNull(identifyScreen(els("설정", "검색"), maps))
 
