@@ -7,7 +7,7 @@ import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/contracts/error_code.dart';
 import 'package:screen_guide/shared/theme/app_tokens.dart';
 
-/// E · 다시 시도 (Figma 15:281). 오류 코드만 보고 문구를 고른다 (설계 4장).
+/// E · 다시 시도 (Figma 15:281). 오류 코드만 보고 문구를 고른다. 추정 안내를 하지 않는다 (시스템설계_최종 3-9).
 class ErrorScreen extends StatelessWidget {
   const ErrorScreen({super.key, required this.flow});
   final GuideFlow flow;

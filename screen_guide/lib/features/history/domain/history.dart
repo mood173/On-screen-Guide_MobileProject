@@ -29,9 +29,9 @@ class HistoryEntry {
   final List<String> piiTypes;
 }
 
-/// 포트: 안내 기록. ── 제공: 팀원 3 / 사용: 팀원 2 (DONE "안내 기록에 저장", HISTORY 화면)
+/// 포트: 안내 기록. ── 구현: 최정혁 / 사용: 지형주 (DONE "안내 기록에 저장", HISTORY 화면)
 ///
-/// 구현: InMemoryHistoryRepository(지금) → 로컬 DB(3주차) → 동의 시 Firebase 동기화(4주차, 선택)
+/// 구현: InMemoryHistoryRepository(지금) → 로컬 DB(11/27) → 동의 시 서버 동기화(선택)
 abstract interface class HistoryRepository {
   Future<void> save(HistoryEntry entry);
 

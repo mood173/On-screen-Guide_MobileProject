@@ -43,11 +43,11 @@ class GuideAction {
   final List<GuideStep> steps;
 }
 
-/// 포트: 기능 맵 조회. ── 제공: 팀원 3 (데이터·입출력) / 사용: 팀원 2 (흐름), 간접적으로 팀원 1 (Kotlin)
+/// 포트: 기능 맵 조회. ── 구현: 최정혁 / 사용: 지형주 (흐름), 간접적으로 강민준 (Kotlin)
 ///
 /// 기능 맵의 유일한 원본은 Flutter 쪽 이 저장소다 (계약 v1 결정 1).
-/// 구현: DemoGuidanceRepository(체험용, 지금) → 로컬 DB 구현(3주차) → Firebase 갱신 반영(4주차)
-/// 진짜 구현은 test/ports/guidance_repository_contract.dart 공용 시험을 통과해야 연결한다.
+/// 구현: DemoGuidanceRepository(체험용, 지금) → 실제 앱 기능 맵(11/27) → Firebase 갱신 반영(선택, 12/2)
+/// 진짜 구현은 test/ports/port_contracts.dart의 guidanceRepositoryContract(맵 규칙)를 통과해야 연결한다.
 abstract interface class GuidanceRepository {
   /// 분석 요청에 함께 넣을 맵 조각: 지원하는 모든 화면의 screenId와 앵커.
   Future<GuidanceFragment> fragment();

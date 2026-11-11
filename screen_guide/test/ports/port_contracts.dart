@@ -1,6 +1,6 @@
 // 포트 공용 시험. 가짜 구현과 진짜 구현이 **같은 시험**을 통과해야 bootstrap에서 바꿔 끼울 수 있다.
 //
-// 팀원 3이 진짜 구현을 만들면 test/ports/ 에 이렇게 한 줄을 추가한다:
+// 최정혁이 진짜 구현을 만들면 test/ports/ 에 이렇게 한 줄을 추가한다:
 //   void main() => guidanceRepositoryContract('로컬 DB', () => SqfliteGuidanceRepository(...));
 //
 // 이 파일 이름은 _test.dart로 끝나지 않아서 단독으로 실행되지 않고, 다른 시험 파일이 불러 쓴다.
