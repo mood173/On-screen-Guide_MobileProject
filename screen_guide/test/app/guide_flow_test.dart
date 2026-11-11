@@ -51,7 +51,12 @@ class _OneActionRepo implements GuidanceRepository {
       title: '배터리 확인',
       description: '배터리 사용량을 봐요',
       steps: [
-        GuideStep(selector: '배터리', instruction: '배터리를 눌러주세요', result: ''),
+        GuideStep(
+          screenId: 'settings',
+          selector: '배터리',
+          instruction: '배터리를 눌러주세요',
+          result: '',
+        ),
       ],
     ),
   ];
@@ -67,6 +72,8 @@ class _RecordingFiles implements ImageFiles {
       '/cache/sg_${++_n}/${sample.asset.split('/').last}';
   @override
   Future<void> release(String path) async => released.add(path);
+  @override
+  Future<void> clearLeftovers() async {}
 }
 
 void main() {

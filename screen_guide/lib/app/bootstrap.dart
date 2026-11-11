@@ -2,7 +2,7 @@ import 'package:screen_guide/app/guide_flow.dart';
 import 'package:screen_guide/features/analyze/data/fake_analyzer.dart';
 import 'package:screen_guide/features/analyze/data/method_channel_analyzer.dart';
 import 'package:screen_guide/features/analyze/domain/screen_analyzer.dart';
-import 'package:screen_guide/features/capture/data/fake_image_input.dart';
+import 'package:screen_guide/features/capture/data/fake_input.dart';
 import 'package:screen_guide/features/capture/data/image_files.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/features/guidance_map/data/demo_guidance.dart';
@@ -31,7 +31,7 @@ const bool useFakeAnalyzer = bool.fromEnvironment(
 /// | ScreenAnalyzer | 팀원 1 | FakeAnalyzer | MethodChannelAnalyzer (Kotlin 채널이 계약 v1 형식이 되면) |
 /// | GuidanceRepository | 팀원 3 | DemoGuidanceRepository | 로컬 DB 구현 |
 /// | HistoryRepository | 팀원 3 | InMemoryHistoryRepository | 로컬 DB 구현 |
-/// | ImageInput | 팀원 3 | FakeImageInput | image_picker 구현 |
+/// | GalleryInput·CameraInput·InputCleanup | 팀원 3 | FakeGalleryInput 등 | image_picker·photo_manager 구현 |
 /// | Sharer | 팀원 3 | FakeSharer | share_plus 구현 |
 /// | MapUpdater | 팀원 3 | FakeMapUpdater | Firebase 구현 |
 class AppDependencies {
@@ -40,7 +40,9 @@ class AppDependencies {
     required this.imageFiles,
     required this.guidance,
     required this.history,
-    required this.imageInput,
+    required this.galleryInput,
+    required this.cameraInput,
+    required this.inputCleanup,
     required this.sharer,
     required this.mapUpdater,
   });
@@ -49,7 +51,9 @@ class AppDependencies {
   final ImageFiles imageFiles;
   final GuidanceRepository guidance;
   final HistoryRepository history;
-  final ImageInput imageInput;
+  final GalleryInput galleryInput;
+  final CameraInput cameraInput;
+  final InputCleanup inputCleanup;
   final Sharer sharer;
   final MapUpdater mapUpdater;
 
@@ -58,7 +62,9 @@ class AppDependencies {
     files: imageFiles,
     guidance: guidance,
     history: history,
-    imageInput: imageInput,
+    galleryInput: galleryInput,
+    cameraInput: cameraInput,
+    inputCleanup: inputCleanup,
     sharer: sharer,
     mapUpdater: mapUpdater,
   );
@@ -72,7 +78,9 @@ AppDependencies bootstrap({bool? fake}) {
     imageFiles: files,
     guidance: const DemoGuidanceRepository(), // 팀원 3: 로컬 DB 구현으로 교체
     history: InMemoryHistoryRepository(), // 팀원 3: 로컬 DB 구현으로 교체
-    imageInput: FakeImageInput(files: files), // 팀원 3: image_picker 구현으로 교체
+    galleryInput: FakeGalleryInput(files: files), // 팀원 3: 실제 갤러리 구현으로 교체
+    cameraInput: FakeCameraInput(files: files), // 팀원 3: image_picker 구현으로 교체
+    inputCleanup: FakeInputCleanup(files: files), // 팀원 3: 실제 구현으로 교체
     sharer: FakeSharer(), // 팀원 3: share_plus 구현으로 교체
     mapUpdater: FakeMapUpdater(), // 팀원 3: Firebase 구현으로 교체
   );

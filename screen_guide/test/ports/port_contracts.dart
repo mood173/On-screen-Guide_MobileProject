@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
 import 'package:screen_guide/features/history/domain/history.dart';
+import 'package:screen_guide/features/share/domain/sharer.dart';
 
 void guidanceRepositoryContract(
   String name,
@@ -81,7 +82,7 @@ void historyRepositoryContract(
     actionId: 'settings.notification',
     actionTitle: '알림 설정 바꾸기',
     stepInstructions: const ['알림 설정을 눌러주세요'],
-    input: 'gallery',
+    input: InputKind.gallery,
     createdAt: DateTime(2026, 11, 20, 10, minute),
     piiTypes: const ['휴대전화'],
   );
@@ -120,19 +121,80 @@ void historyRepositoryContract(
   });
 }
 
-/// [ImageInput]은 실제 기기·사용자 동작이 필요해 자동 시험이 어렵다.
-/// 가짜 구현으로 흐름이 기대하는 결과 모양만 확인하고, 진짜 구현은 에뮬레이터 확인 목록(문서)으로 점검한다.
-void imageInputShapeContract(String name, ImageInput Function() create) {
-  group('ImageInput 결과 모양 · $name', () {
-    test('성공이면 path가 있고, 앱 복사본만 appOwned', () async {
-      final r = await create().pickFromGallery();
-      if (r.status == PickStatus.ok) {
-        expect(r.path, isNotNull);
-        expect(r.ok, isTrue);
-      } else {
-        expect(r.path, isNull);
-        expect(r.ok, isFalse);
+/// 사진 가져오기 포트는 실제 기기·사용자 동작이 필요해 자동 시험이 어렵다.
+/// 흐름이 기대하는 결과 모양만 확인하고, 진짜 구현은 에뮬레이터 확인 목록으로 점검한다.
+void _shape(PickedImage r, InputKind input) {
+  expect(r.input, input);
+  if (r.status == PickStatus.ok) {
+    expect(r.path, isNotNull);
+    expect(r.ok, isTrue);
+  } else {
+    expect(r.path, isNull, reason: '실패하면 경로가 없다');
+    expect(r.ok, isFalse);
+  }
+}
+
+void galleryInputContract(String name, GalleryInput Function() create) {
+  group('GalleryInput 결과 모양 · $name', () {
+    test('권한 결과는 ok 또는 permissionDenied', () async {
+      expect(
+        await create().requestAccess(),
+        anyOf(PickStatus.ok, PickStatus.permissionDenied),
+      );
+    });
+
+    test('최근 목록은 limit장 이하, 고른 한 장은 gallery 입력', () async {
+      final g = create();
+      final items = await g.recent(limit: 9);
+      expect(items.length, lessThanOrEqualTo(9));
+      expect((await g.recent(limit: 1)).length, lessThanOrEqualTo(1));
+      for (final it in items) {
+        _shape(await g.use(it.id), InputKind.gallery);
       }
+    });
+
+    test('모르는 id면 예외 없이 실패 값', () async {
+      final r = await create().use('no_such_id');
+      expect(r.ok, isFalse);
+      expect(r.input, InputKind.gallery);
+    });
+  });
+}
+
+void cameraInputContract(String name, CameraInput Function() create) {
+  group('CameraInput 결과 모양 · $name', () {
+    test('찍은 한 장은 camera 입력', () async {
+      _shape(await create().takePhoto(), InputKind.camera);
+    });
+  });
+}
+
+void inputCleanupContract(String name, InputCleanup Function() create) {
+  group('InputCleanup · $name', () {
+    test('사용자 원본·경로 없는 결과를 넘겨도 예외 없이 끝난다 (앱 복사본만 지운다)', () async {
+      final c = create();
+      await c.release(
+        const PickedImage(
+          status: PickStatus.ok,
+          path: '/user/DCIM/original.png',
+          input: InputKind.gallery,
+        ),
+      );
+      await c.release(
+        const PickedImage.failed(PickStatus.cancelled, InputKind.camera),
+      );
+      await c.clearLeftovers();
+    });
+  });
+}
+
+void sharerContract(String name, Sharer Function() create) {
+  group('Sharer · $name', () {
+    test('결과는 예외가 아니라 세 값 중 하나로 온다', () async {
+      expect(
+        await create().shareText('알림 설정 바꾸기 · 사용 방법 1단계'),
+        isA<ShareOutcome>(),
+      );
     });
   });
 }

@@ -46,6 +46,7 @@ abstract final class DemoGuidance {
       description: '앱별 알림을 켜고 끄는 화면으로 가요',
       steps: [
         GuideStep(
+          screenId: 'settings',
           selector: '알림 설정',
           instruction: '알림 설정을 눌러주세요',
           result: '앱별 알림을 켜고 끌 수 있는 화면이 열려요.',
@@ -59,6 +60,7 @@ abstract final class DemoGuidance {
       description: '디스플레이에서 글꼴 크기를 바꿔요',
       steps: [
         GuideStep(
+          screenId: 'settings',
           selector: '디스플레이',
           instruction: '디스플레이를 눌러주세요',
           result: '어두운 테마와 글꼴 크기를 바꾸는 화면이 열려요.',
@@ -72,11 +74,13 @@ abstract final class DemoGuidance {
       description: '대화방에서 메시지를 적어 보내요',
       steps: [
         GuideStep(
+          screenId: 'chat',
           selector: '메시지 입력',
           instruction: '메시지 입력 칸을 눌러주세요',
           result: '키보드가 열리면 보낼 내용을 적어요.',
         ),
         GuideStep(
+          screenId: 'chat',
           selector: '보내기',
           instruction: '보내기를 눌러주세요',
           result: '적은 메시지가 상대에게 전달돼요.',

@@ -1,12 +1,17 @@
 import 'package:screen_guide/shared/contracts/analysis.dart';
 
-/// 안내 한 단계. (기능·개념 정리 9.2 guidance_maps의 steps 한 칸)
+/// 안내 한 단계. (협업규격_최종 3.2)
 class GuideStep {
   const GuideStep({
+    required this.screenId,
     required this.selector,
     required this.instruction,
     required this.result,
   });
+
+  /// 이 단계를 하는 화면 (맵 조각에 있는 화면 ID). 단계가 다른 화면에 걸칠 수 있다 (기능별_검토_결론 4-2).
+  /// 첫 단계의 화면 = 기능의 시작 화면.
+  final String screenId;
 
   /// 이 단계에서 누를 UI의 글자. Kotlin 대상 찾기 요청의 target.selector로 그대로 넘어간다.
   final String selector;

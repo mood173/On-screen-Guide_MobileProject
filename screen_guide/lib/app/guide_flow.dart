@@ -6,7 +6,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:screen_guide/features/analyze/domain/screen_analyzer.dart';
-import 'package:screen_guide/features/capture/data/fake_image_input.dart';
+import 'package:screen_guide/features/capture/data/fake_input.dart';
 import 'package:screen_guide/features/capture/data/image_files.dart';
 import 'package:screen_guide/features/capture/data/sample_images.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
@@ -34,7 +34,9 @@ class GuideFlow extends ChangeNotifier {
     GuidanceRepository guidance = const DemoGuidanceRepository(),
     HistoryRepository? history,
     ImageFiles files = const AssetPathImageFiles(),
-    ImageInput? imageInput,
+    GalleryInput? galleryInput,
+    CameraInput? cameraInput,
+    InputCleanup? inputCleanup,
     Sharer? sharer,
     MapUpdater? mapUpdater,
     this.slowAfter = const Duration(seconds: 3),
@@ -42,7 +44,9 @@ class GuideFlow extends ChangeNotifier {
        _guidance = guidance,
        _history = history ?? InMemoryHistoryRepository(),
        _files = files,
-       imageInput = imageInput ?? FakeImageInput(files: files),
+       galleryInput = galleryInput ?? FakeGalleryInput(files: files),
+       cameraInput = cameraInput ?? FakeCameraInput(files: files),
+       inputCleanup = inputCleanup ?? FakeInputCleanup(files: files),
        sharer = sharer ?? FakeSharer(),
        mapUpdater = mapUpdater ?? FakeMapUpdater();
 
@@ -52,8 +56,10 @@ class GuideFlow extends ChangeNotifier {
   final HistoryRepository _history; // 팀원 3 (이력)
   final ImageFiles _files; // 체험용 샘플 → 파일 경로
 
-  /// 팀원 3 (image_picker). 2주차 카메라·실제 갤러리 화면에서 사용.
-  final ImageInput imageInput;
+  /// 사진 가져오기 (최정혁). 갤러리·카메라 장면, 세션 정리에서 사용.
+  final GalleryInput galleryInput;
+  final CameraInput cameraInput;
+  final InputCleanup inputCleanup;
 
   /// 팀원 3 (share_plus). 2~3주차 P → SHARE 화면에서 사용.
   final Sharer sharer;
@@ -310,7 +316,7 @@ class GuideFlow extends ChangeNotifier {
         actionId: a.actionId,
         actionTitle: a.title,
         stepInstructions: [for (final s in a.steps) s.instruction],
-        input: 'sample',
+        input: InputKind.gallery, // TODO(3번): 세션의 입력 방식으로
         createdAt: DateTime.now(),
         piiTypes: [
           for (final p in result?.pii ?? const <PiiCandidate>[]) p.type,

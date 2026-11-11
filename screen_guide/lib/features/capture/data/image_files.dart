@@ -8,9 +8,16 @@ import 'package:screen_guide/features/capture/data/sample_images.dart';
 /// 샘플은 Flutter 에셋이라 파일이 아니므로, 앱 캐시 폴더에 복사본을 만들어 그 경로를 쓴다.
 ///
 /// 앱이 만든 복사본만 지운다. 사용자 원본은 지우지 않는다 (기능·개념 정리 12.1 ⑨).
+///
+/// 포트가 아니다. 체험용 가짜 입력(fake_input.dart)이 안쪽에서 쓰는 도구다 (협업규격_최종 6-3).
 abstract interface class ImageFiles {
   Future<String> prepare(SampleImage sample);
+
+  /// 앱이 만든 복사본(sg_ 폴더)일 때만 지운다.
   Future<void> release(String path);
+
+  /// 앱 시작 때 남은 sg_ 복사본을 모두 지운다.
+  Future<void> clearLeftovers();
 }
 
 /// 실제 구현: Android에서 [Directory.systemTemp]는 앱 전용 임시 폴더(`code_cache`)다.
@@ -34,6 +41,20 @@ class CacheImageFiles implements ImageFiles {
       // 이미 지워졌으면 무시
     }
   }
+
+  @override
+  Future<void> clearLeftovers() async {
+    try {
+      await for (final e in Directory.systemTemp.list()) {
+        final name = e.path.split(RegExp(r'[\\/]')).last;
+        if (e is Directory && name.startsWith('sg_')) {
+          await e.delete(recursive: true);
+        }
+      }
+    } on FileSystemException {
+      // 읽거나 지우지 못한 것은 다음 시작 때 다시 시도
+    }
+  }
 }
 
 /// 시험용: 파일을 만들지 않고 에셋 경로를 그대로 쓴다 (가짜 분석기는 파일 이름으로 샘플을 찾음).
@@ -45,4 +66,7 @@ class AssetPathImageFiles implements ImageFiles {
 
   @override
   Future<void> release(String path) async {}
+
+  @override
+  Future<void> clearLeftovers() async {}
 }

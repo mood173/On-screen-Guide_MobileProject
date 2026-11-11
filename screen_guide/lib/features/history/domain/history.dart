@@ -1,4 +1,6 @@
-/// 안내 기록 한 건. 원본 이미지·OCR 원문·개인정보 후보 원문은 담지 않는다 (명세 C03, 설계 9.1).
+import 'package:screen_guide/features/capture/domain/image_input.dart';
+
+/// 안내 기록 한 건. 원본 이미지·화면에서 읽은 글자·개인정보 후보 값을 담는 칸은 없다 (협업규격_최종 3.2).
 class HistoryEntry {
   const HistoryEntry({
     required this.id,
@@ -19,8 +21,8 @@ class HistoryEntry {
   /// 단계별 안내 문구 ("알림 설정을 눌러주세요" …) — 사용 방법 다시 보기·공유에 쓴다.
   final List<String> stepInstructions;
 
-  /// 입력 방식: gallery / camera / sample
-  final String input;
+  /// 입력 방식 (세션의 입력 방식에서)
+  final InputKind input;
   final DateTime createdAt;
 
   /// 개인정보 후보 유형 이름만 (가린 값·원문 없음)
