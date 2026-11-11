@@ -179,6 +179,19 @@ class TargetMatch {
 }
 
 /// 개인정보 후보. 원문은 오지 않고 가린 값(앞 3자·뒤 2자)만 온다.
+/// 개인정보 후보 유형 9개 (협업규격_최종 3.3). pii[].type은 이 값 중 하나이고 엔진 이름을 붙이지 않는다.
+const piiTypes = [
+  '주민·외국인등록번호',
+  '휴대전화',
+  '유선전화',
+  '계좌번호 추정',
+  '전화',
+  '이메일',
+  '주소',
+  '카드',
+  'URL',
+];
+
 class PiiCandidate {
   const PiiCandidate({
     required this.type,
@@ -186,7 +199,7 @@ class PiiCandidate {
     required this.elementIndex,
   });
 
-  /// 유형 이름 (예: 휴대전화, 주민·외국인등록번호, 이메일(ML Kit))
+  /// 유형 이름: [piiTypes] 9개 중 하나
   final String type;
   final String masked;
 

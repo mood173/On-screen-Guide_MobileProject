@@ -3,10 +3,11 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:screen_guide/features/guidance_map/data/demo_guidance.dart';
 import 'package:screen_guide/shared/contracts/analysis.dart';
 import 'package:screen_guide/shared/contracts/error_code.dart';
 
-// contract_fixtures/analyze/ 의 공용 예시 파일을 읽는다. Kotlin(팀원 1) JUnit도 같은 파일을 쓴다.
+// contract_fixtures/analyze/ 의 공용 예시 파일을 읽는다. Kotlin(강민준) JUnit도 같은 파일을 쓴다.
 Map<String, dynamic> _load(String name) =>
     jsonDecode(File('contract_fixtures/analyze/$name').readAsStringSync())
         as Map<String, dynamic>;
@@ -38,7 +39,9 @@ void main() {
   test('각 응답 예시가 흐름에서 뜻하는 것', () {
     final ok = AnalysisResult.fromJson(_load('response_ok.json'));
     expect(
-      ok.ok && ok.screenId == 'settings' && ok.target!.match == MatchKind.exact,
+      ok.ok &&
+          ok.screenId == 'demo.settings' &&
+          ok.target!.match == MatchKind.exact,
       isTrue,
     );
 
@@ -62,6 +65,32 @@ void main() {
     final err = AnalysisResult.fromJson(_load('response_error.json'));
     expect(err.ok, isFalse);
     expect(err.errorCode, ErrorCode.imageReadFailed);
+  });
+
+  test('예시 값이 협업규격_최종 3.2·3.3 규칙을 따른다', () {
+    // 요청의 맵 조각 = 체험용 기능 맵 (가짜 분석기·Kotlin JUnit이 같은 맵으로 식별)
+    for (final name in ['request_first.json', 'request_step.json']) {
+      expect(
+        _load(name)['guidance'],
+        DemoGuidance.fragment.toJson(),
+        reason: name,
+      );
+    }
+    for (final name in [
+      'response_ok.json',
+      'response_pii.json',
+      'response_unknown_screen.json',
+      'response_error.json',
+    ]) {
+      final r = AnalysisResult.fromJson(_load(name));
+      for (final p in r.pii) {
+        expect(piiTypes, contains(p.type), reason: '$name: 유형 9개 중 하나');
+      }
+      final code = _load(name)['errorCode'];
+      if (code != null) {
+        expect(code, (code as String).toUpperCase(), reason: '오류 코드는 대문자');
+      }
+    }
   });
 
   test('모든 예시 파일이 시험 대상에 들어 있다', () {

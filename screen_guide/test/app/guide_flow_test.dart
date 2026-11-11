@@ -55,12 +55,12 @@ class _OneActionRepo implements GuidanceRepository {
   Future<List<GuideAction>> actionsFor(String screenId) async => const [
     GuideAction(
       actionId: 'settings.battery',
-      screenId: 'settings',
+      screenId: 'demo.settings',
       title: '배터리 확인',
       description: '배터리 사용량을 봐요',
       steps: [
         GuideStep(
-          screenId: 'settings',
+          screenId: 'demo.settings',
           selector: '배터리',
           instruction: '배터리를 눌러주세요',
           result: '',
@@ -105,7 +105,7 @@ void main() {
 
     await f.dispatch(ActionId.analyzeRun);
     expect(f.screen, ScreenId.rg);
-    expect(f.result!.screenId, 'settings');
+    expect(f.result!.screenId, 'demo.settings');
     expect(
       f.availableActions.map((a) => a.actionId),
       contains('settings.notification'),
@@ -130,7 +130,7 @@ void main() {
 
   test('2단계 기능은 D1 → D2로 넘어가며 단계마다 대상을 다시 찾는다', () async {
     final f = await _toResult(SampleImage.chat);
-    expect(f.result!.screenId, 'chat');
+    expect(f.result!.screenId, 'demo.chat');
     expect(f.result!.pii, hasLength(5));
 
     final send = DemoGuidance.actions.firstWhere(
@@ -208,7 +208,7 @@ void main() {
     await f.dispatch(ActionId.analyzeRun);
 
     expect(hold.calls.single.imagePath, '/cache/sg_1/sample_chat.png');
-    expect(f.result!.screenId, 'chat', reason: '가짜 분석기는 파일 이름으로 샘플을 찾는다');
+    expect(f.result!.screenId, 'demo.chat', reason: '가짜 분석기는 파일 이름으로 샘플을 찾는다');
 
     await f.dispatch(ActionId.navHome);
     expect(files.released, ['/cache/sg_1/sample_chat.png']);

@@ -3,7 +3,7 @@
   "status": "ok",
   "errorCode": null,
   "imageSize": { "w": 1080, "h": 2340 },
-  "screenId": "chat",
+  "screenId": "demo.chat",
   "elements": [
     { "label": "홍길동 대화", "box": [44, 116, 258, 161] },
     { "label": "네 맞아요. 연락은 010-1234-5678 로 주세요", "box": [210, 492, 962, 533] },

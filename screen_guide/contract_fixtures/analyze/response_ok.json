@@ -3,7 +3,7 @@
   "status": "ok",
   "errorCode": null,
   "imageSize": { "w": 1080, "h": 2340 },
-  "screenId": "settings",
+  "screenId": "demo.settings",
   "elements": [
     { "label": "설정", "box": [52, 153, 165, 218] },
     { "label": "알림 설정", "box": [174, 1029, 341, 1070] },

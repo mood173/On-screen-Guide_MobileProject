@@ -9,7 +9,7 @@ import 'package:screen_guide/shared/contracts/error_code.dart';
 const _guidance = GuidanceFragment(
   packageName: 'com.android.settings',
   screens: [
-    ScreenAnchors(screenId: 'settings', anchors: ['설정', '알림 설정']),
+    ScreenAnchors(screenId: 'demo.settings', anchors: ['배터리', '알림 설정']),
   ],
 );
 
@@ -29,6 +29,84 @@ AnalyzeRequest _req({String? selector}) => AnalyzeRequest(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  group('FakeAnalyzer 규칙 (협업규격_최종 3.3, 기능별_검토_결론 2-2)', () {
+    UiElement el(String label, [int y = 0]) =>
+        UiElement(label: label, box: Box(0, y, 100, y + 10));
+    GuidanceFragment map(Map<String, List<String>> screens) => GuidanceFragment(
+      packageName: '',
+      screens: [
+        for (final e in screens.entries)
+          ScreenAnchors(screenId: e.key, anchors: e.value),
+      ],
+    );
+
+    test('A: 한 줄이 앵커 두 개로 세어지지 않는다', () {
+      final g = map({
+        'a.home': ['설정', '알림 설정'],
+      });
+      expect(FakeAnalyzer.identify([el('알림 설정')], g), isNull);
+      expect(FakeAnalyzer.identify([el('설정'), el('알림 설정', 20)], g), 'a.home');
+    });
+
+    test('B: 가장 많이 맞은 화면, 같은 수면 식별하지 않는다', () {
+      final els = [el('홈'), el('검색', 10), el('주문', 20)];
+      expect(
+        FakeAnalyzer.identify(
+          els,
+          map({
+            'a.one': ['홈', '검색'],
+            'a.two': ['홈', '검색', '주문'],
+          }),
+        ),
+        'a.two',
+      );
+      expect(
+        FakeAnalyzer.identify(
+          els,
+          map({
+            'a.one': ['홈', '검색'],
+            'a.two': ['검색', '주문'],
+          }),
+        ),
+        isNull,
+      );
+    });
+
+    test('C: 같은 글자가 둘 이상이면 대상을 고르지 않는다', () {
+      expect(
+        FakeAnalyzer.findTarget([el('보내기'), el('보내기', 20)], '보내기'),
+        isNull,
+      );
+      expect(
+        FakeAnalyzer.findTarget([el('보내기')], '보내기')!.match,
+        MatchKind.exact,
+      );
+      expect(
+        FakeAnalyzer.findTarget([el('보냬기')], '보내기')!.match,
+        MatchKind.fuzzy,
+      );
+      expect(
+        FakeAnalyzer.findTarget([el('앱')], '압'),
+        isNull,
+        reason: '한 글자는 오인식 허용 안 함',
+      );
+    });
+
+    test('샘플 정답의 개인정보 유형은 9개 값 중 하나', () async {
+      final r = await FakeAnalyzer(delay: Duration.zero).analyze(
+        AnalyzeRequest(
+          requestId: 'p',
+          imagePath: 'x/sample_chat.png',
+          guidance: _guidance,
+        ),
+      );
+      expect(r.pii, isNotEmpty);
+      for (final p in r.pii) {
+        expect(piiTypes, contains(p.type));
+      }
+    });
+  });
+
   group('FakeAnalyzer', () {
     final fake = FakeAnalyzer(delay: Duration.zero);
 
@@ -36,7 +114,7 @@ void main() {
       final r = await fake.analyze(_req());
       expect(r.requestId, 'req-1');
       expect(r.ok, isTrue);
-      expect(r.screenId, 'settings');
+      expect(r.screenId, 'demo.settings');
       expect(r.target, isNull, reason: 'target 없는 요청');
     });
 

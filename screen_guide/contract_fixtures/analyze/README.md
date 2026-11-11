@@ -1,6 +1,7 @@
 # 채널 계약 예시 (screen_guide/analyze)
 
-Flutter(팀원 2)와 Kotlin(팀원 1)이 **같은 파일**로 시험한다. 형식은 개발 계약 v1 결정 1.
+Flutter(지형주)와 Kotlin(강민준)이 **같은 파일**로 시험한다. 형식은 개발 계약 v1 결정 1, 값의 규칙은 협업규격_최종 3.2·3.3
+(화면 ID는 앱.화면, 앵커끼리 포함 금지, 개인정보 유형 9개, 오류 코드 대문자).
 
 | 파일 | 상황 | Flutter가 하는 일 |
 |---|---|---|
@@ -11,7 +12,7 @@ Flutter(팀원 2)와 Kotlin(팀원 1)이 **같은 파일**로 시험한다. 형�
 | response_unknown_screen.json | screenId null | E (UNKNOWN_SCREEN) |
 | response_error.json | 이미지 읽기 실패 | E (IMAGE_READ_FAILED) |
 
-- Flutter: `test/contract/fixtures_test.dart`가 모든 파일을 읽어 DTO로 바꾸고 다시 써서 같은지 확인한다.
+- Flutter: `test/shared/contracts/fixtures_test.dart`가 모든 파일을 읽어 DTO로 바꾸고 다시 써서 같은지 확인한다.
 - Kotlin: JUnit에서 `File("../../contract_fixtures/analyze/request_step.json")`(android/app 기준)을 읽어
   요청을 해석하고, 만든 응답이 response_*.json과 같은 키·타입인지 확인한다.
-- 형식을 바꾸면: 계약 문서 → 이 파일들 → 양쪽 코드 순서로 고치고 팀 방에 알린다.
+- 형식을 바꾸면: 협업규격_최종 3장 → 이 파일들 → 양쪽 코드 순서로 고치고 팀 방에 알린다.

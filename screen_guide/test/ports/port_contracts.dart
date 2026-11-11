@@ -17,21 +17,44 @@ void guidanceRepositoryContract(
   GuidanceRepository Function() create,
 ) {
   group('GuidanceRepository 계약 · $name', () {
-    test('맵 조각: 화면마다 screenId가 있고 앵커가 2개 이상이다 (화면 식별 규칙: 앵커 2개 이상)', () async {
+    // 맵 규칙: 협업규격_최종 3.2 "기능 맵 규칙" 표
+    test('맵 조각: 화면 ID는 앱.화면이고 겹치지 않으며, 화면마다 앵커 2개 이상', () async {
       final f = await create().fragment();
-      expect(f.packageName, isNotEmpty);
+      // packageName은 이미지 입력에서 빈 문자열로 둘지 미결 (협업규격_최종 8장 5번) → 값은 확인하지 않는다
       expect(f.screens, isNotEmpty);
+      final ids = f.screens.map((s) => s.screenId).toList();
+      expect(ids.toSet().length, ids.length, reason: '화면 ID는 전체에서 겹치지 않는다');
       for (final s in f.screens) {
-        expect(s.screenId, isNotEmpty);
+        expect(
+          s.screenId,
+          matches(RegExp(r'^[a-z0-9_]+\.[a-z0-9_]+$')),
+          reason: '앱.화면 형식: ${s.screenId}',
+        );
         expect(s.anchors.length, greaterThanOrEqualTo(2), reason: s.screenId);
       }
     });
 
+    test('앵커끼리 서로 포함하지 않는다 (한 줄이 앵커 두 개로 세어지는 것을 막는다)', () async {
+      for (final s in (await create().fragment()).screens) {
+        for (final a in s.anchors) {
+          for (final b in s.anchors) {
+            if (a == b) continue;
+            expect(
+              b.contains(a),
+              isFalse,
+              reason: '${s.screenId}: "$a" ⊂ "$b"',
+            );
+          }
+        }
+      }
+    });
+
     test(
-      '기능: 맵 조각에 있는 화면의 기능은 그 screenId를 갖고, 단계가 1개 이상이며 selector가 비어 있지 않다',
+      '기능: 영역.동작 ID, 단계 1~5개, 단계 화면은 맵 조각에 있고 첫 단계 화면 = 시작 화면, 선택자 2자 이상',
       () async {
         final repo = create();
         final f = await repo.fragment();
+        final screens = f.screens.map((s) => s.screenId).toSet();
         var total = 0;
         for (final s in f.screens) {
           final actions = await repo.actionsFor(s.screenId);
@@ -43,9 +66,23 @@ void guidanceRepositoryContract(
               matches(RegExp(r'^[a-z0-9_]+\.[a-z0-9_]+$')),
               reason: '영역.동작 형식 (계약 v1 결정 2)',
             );
-            expect(a.steps, isNotEmpty, reason: a.actionId);
+            expect(a.steps.length, inInclusiveRange(1, 5), reason: a.actionId);
+            expect(
+              a.steps.first.screenId,
+              a.screenId,
+              reason: '${a.actionId}: 첫 단계 화면 = 시작 화면',
+            );
             for (final st in a.steps) {
-              expect(st.selector.trim(), isNotEmpty, reason: a.actionId);
+              expect(
+                screens,
+                contains(st.screenId),
+                reason: '${a.actionId}: 단계 화면 ${st.screenId}',
+              );
+              expect(
+                st.selector.trim().length,
+                greaterThanOrEqualTo(2),
+                reason: '${a.actionId}: 선택자 "${st.selector}"',
+              );
               expect(st.instruction.trim(), isNotEmpty, reason: a.actionId);
             }
           }

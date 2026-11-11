@@ -4,8 +4,8 @@
   "guidance": {
     "packageName": "demo.screen_guide",
     "screens": [
-      { "screenId": "settings", "anchors": ["설정", "알림 설정", "배터리", "디스플레이"] },
-      { "screenId": "chat", "anchors": ["대화", "메시지 입력", "보내기"] }
+      { "screenId": "demo.settings", "anchors": ["네트워크 및 인터넷", "알림 설정", "배터리", "디스플레이"] },
+      { "screenId": "demo.chat", "anchors": ["대화", "메시지 입력", "보내기"] }
     ]
   }
 }

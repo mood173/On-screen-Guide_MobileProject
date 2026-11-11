@@ -37,7 +37,7 @@ class SampleAnswer {
     fileName: 'sample_settings.png',
     width: 1080,
     height: 2340,
-    screenId: 'settings',
+    screenId: 'demo.settings',
     elements: [
       UiElement(label: '10:23', box: Box(45, 23, 120, 50)),
       UiElement(label: 'LTE 87%', box: Box(914, 25, 1037, 50)),
@@ -68,7 +68,7 @@ class SampleAnswer {
     fileName: 'sample_chat.png',
     width: 1080,
     height: 2340,
-    screenId: 'chat',
+    screenId: 'demo.chat',
     elements: [
       UiElement(label: '10:23', box: Box(45, 25, 123, 51)),
       UiElement(label: 'LTE 87%', box: Box(914, 25, 1037, 50)),
@@ -106,7 +106,7 @@ class SampleAnswer {
         elementIndex: 9,
       ),
       PiiCandidate(
-        type: '이메일(ML Kit)',
+        type: '이메일',
         masked: 'gil****@*******.*om',
         elementIndex: 10,
       ),

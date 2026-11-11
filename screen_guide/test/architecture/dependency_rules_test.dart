@@ -104,4 +104,22 @@ void main() {
     );
     expect(_violation('shared/cells/a.dart', 'app/guide_flow.dart'), isNotNull);
   });
+
+  test('기록 자료형에 이미지·인식 글자·가린 값 칸이 없다 (기능별_검토_결론 6장, MP3)', () {
+    final src = File('lib/features/history/domain/history.dart')
+        .readAsStringSync();
+    final body = src.substring(
+      src.indexOf('class HistoryEntry'),
+      src.indexOf('abstract interface class'),
+    );
+    final fields = RegExp(
+      r'^\s+final [\w<>?, ]+ (\w+);',
+      multiLine: true,
+    ).allMatches(body).map((m) => m.group(1)!.toLowerCase());
+    for (final f in fields) {
+      for (final bad in ['path', 'image', 'ocr', 'masked', 'label', 'text']) {
+        expect(f.contains(bad), isFalse, reason: 'HistoryEntry.$f');
+      }
+    }
+  });
 }
