@@ -30,6 +30,8 @@ void main() {
       'response_ok.json',
       'response_pii.json',
       'response_unknown_screen.json',
+      'response_target_duplicate.json',
+      'response_target_fuzzy.json',
     ]) {
       final json = _load(name);
       expect(AnalysisResult.fromJson(json).toJson(), json, reason: name);
@@ -81,6 +83,8 @@ void main() {
       'response_pii.json',
       'response_unknown_screen.json',
       'response_error.json',
+      'response_target_duplicate.json',
+      'response_target_fuzzy.json',
     ]) {
       final r = AnalysisResult.fromJson(_load(name));
       for (final p in r.pii) {
@@ -106,6 +110,8 @@ void main() {
       'response_pii.json',
       'response_unknown_screen.json',
       'response_error.json',
+      'response_target_duplicate.json',
+      'response_target_fuzzy.json',
     });
   });
 }

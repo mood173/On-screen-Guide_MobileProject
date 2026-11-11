@@ -92,6 +92,17 @@ void main() {
       );
     });
 
+    test('C: 정확 일치가 둘이면 한 글자 차이 요소가 있어도 고르지 않는다 (Kotlin RulesTest와 같은 경우)', () {
+      expect(
+        FakeAnalyzer.findTarget([
+          el('보내기'),
+          el('보내기', 20),
+          el('보냬기', 40),
+        ], '보내기'),
+        isNull,
+      );
+    });
+
     test('샘플 정답의 개인정보 유형은 9개 값 중 하나', () async {
       final r = await FakeAnalyzer(delay: Duration.zero).analyze(
         AnalyzeRequest(
@@ -214,7 +225,7 @@ void main() {
       expect(r.errorCode, ErrorCode.analysisFailed);
     });
 
-    test('Kotlin의 result.error(code)를 오류 결과로 바꾼다', () async {
+    test('안전망: 채널이 PlatformException을 던지면 오류 결과로 바꾼다 (Kotlin은 실패도 result.success 응답 본문으로 보낸다)', () async {
       messenger.setMockMethodCallHandler(channel, (call) async {
         throw PlatformException(code: 'image_read_failed');
       });
