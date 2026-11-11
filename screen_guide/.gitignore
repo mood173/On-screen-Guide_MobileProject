@@ -46,3 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# 루트 .gitignore의 *.lock 규칙에서 이 앱만 뺀다: 팀원 셋이 같은 패키지 버전을 쓰도록 pubspec.lock을 올린다.
+!pubspec.lock
