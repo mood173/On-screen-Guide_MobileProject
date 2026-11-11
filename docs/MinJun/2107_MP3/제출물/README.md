@@ -1,23 +1,67 @@
-# 화면길잡이 · 사진 인식 앱 2107 MP3
+# 화면길잡이 · 사진 인식 앱 2107 MP3 (분석 이력과 공유)
 
-MP1 이미지 입력과 MP2 온디바이스 한국어 OCR에 **결과 텍스트 이력, 개별 삭제, 시스템 공유 시트**를 추가한 Android Flutter 앱입니다.
+MP1의 이미지 입력, MP2의 온디바이스 한국어 글자 인식에 **결과 이력 저장, 개별 삭제, 시스템 공유 시트**를 더한 Android Flutter 앱입니다. 원본 이미지는 저장하지 않고 인식한 글자만 기기에 남깁니다.
 
-## 실행
+## 전체 기능 목록
 
-Android 기기/에뮬레이터 연결 후 이 폴더에서 `flutter pub get`, `flutter run`을 실행합니다. 카메라 촬영 또는 갤러리 선택 → 미리보기 → 이미지 표시 → 이미지 분석하기로 결과를 만듭니다. 결과는 자동으로 로컬 이력에 저장됩니다. 홈의 **분석 이력 보기**에서 목록·공유·삭제를 사용할 수 있습니다.
+| 단계 | 기능 | 설명 |
+|---|---|---|
+| MP1 | 카메라 촬영 | 기기 카메라 앱으로 한 장 촬영 |
+| MP1 | 갤러리 선택 | 시스템 사진 선택기로 한 장 선택 (저장소 권한 없음) |
+| MP1 | 미리보기·이미지 표시 | 고른 이미지를 확인한 뒤 사용 |
+| MP1 | 권한 거부 안내 | 안내 화면에서 앱 설정 열기 또는 갤러리로 전환 |
+| MP2 | 글자 인식 | ML Kit 한국어 Text Recognition, 기기 안에서 실행 |
+| MP2 | 결과 표시 | 인식한 줄 목록과 처리 시간(ms) |
+| MP2 | 인식 불가 안내 | 글자가 없으면 "글자를 찾지 못했어요" 안내 |
+| MP3 | 이력 자동 저장 | 분석이 끝나면 결과 글자를 기기에 저장 |
+| MP3 | 이력 목록 | 홈의 **분석 이력 보기**. 최신순, 항목마다 저장 시각과 앞부분 6줄 |
+| MP3 | 이력 삭제 | 항목별 삭제 |
+| MP3 | 공유 | 항목의 글자를 시스템 공유 시트로 다른 앱에 전달 |
+| MP3 | 임시 이미지 정리 | 분석이 끝나거나 화면을 떠날 때, 그리고 앱 시작 때 캐시의 이미지 복사본 삭제 |
 
-## 실제 구현
+## 이력 데이터 구조
 
-- Flutter `lib/main.dart` → `screen_guide/analyze` MethodChannel → Kotlin `Analyzer.analyzeOcr` → ML Kit Korean Text Recognition → 결과 화면.
-- 분석 성공 콜백에서 Kotlin `HistoryStore`가 결과 텍스트·UUID·저장 시각만 Android `SharedPreferences`에 동기 저장합니다. `screen_guide/history` 채널로 목록·삭제·공유·임시 이미지 정리를 호출합니다.
-- 인식 글자가 없으면 안내 텍스트를 저장합니다. 파일 읽기·OCR·저장 실패는 오류 안내로 구분합니다.
-- 시스템 `ACTION_SEND`/`text/plain` 공유 시트에 결과 텍스트만 전달합니다.
-- 개인정보와 임시 파일 범위는 `PRIVACY.md`를 참조하세요.
+저장 위치는 Android `SharedPreferences` 파일 `analysis_history`의 키 `items` 하나입니다. 값은 아래 항목의 JSON 배열 문자열입니다. 구현은 `android/app/src/main/kotlin/.../HistoryStore.kt`에 있습니다.
 
-## 실제 실행 확인 (Android 에뮬레이터)
+| 필드 | 타입 | 뜻 |
+|---|---|---|
+| `id` | 문자열 | 항목 식별자. 저장할 때 만드는 임의 UUID |
+| `createdAt` | 정수(long) | 저장 시각. 1970년 기준 밀리초 |
+| `text` | 문자열 | 인식한 글자 전체(줄바꿈으로 구분). 글자가 없으면 안내 문구 |
 
-2026-11-10 `Resizable_Experimental` 에뮬레이터에서 이미지 선택→33줄 OCR→이력 저장→앱 강제 종료/재시작 후 이력 유지→시스템 공유 시트에서 텍스트 미리보기→개별 삭제 후 빈 목록까지 직접 확인했습니다. 앱 시작 후 `run-as`로 `cache/`를 조회해 이전 버전에서 남은 이미지 캐시 파일도 정리된 것을 확인했습니다. 비행기 모드 OCR과 빈 이미지 안내는 MP2에서 각각 확인했으며 같은 분석 경로를 MP3에서도 사용합니다. 증거 화면은 `screenshots/`에 있습니다. 실제 휴대전화의 카메라 품질은 별도 확인이 필요합니다.
+```json
+[
+  { "id": "임의 UUID", "createdAt": 1794273138000, "text": "첫째 줄\n둘째 줄" }
+]
+```
 
-## 제출
+- 저장: 배열 끝에 추가하고 `commit()`으로 바로 디스크에 씁니다. 그래서 앱을 강제 종료해도 남습니다.
+- 목록: 배열을 뒤집어 최신 항목부터 돌려줍니다.
+- 삭제: `id`가 같은 항목만 뺀 배열로 다시 씁니다.
+- 이미지 경로, 이미지 바이트, 썸네일, 글자 좌표, 처리 시간은 이 구조에 없습니다. 자세한 범위는 `PRIVACY.md`에 있습니다.
+- Flutter 쪽은 MethodChannel `screen_guide/history`로 `list`, `delete`, `shareText`, `releaseImage`, `purgeCachedImages`를 호출합니다.
 
-ZIP 최상위: `app/`, `README.md`, `screenshots/`, `prompts_log.md`, `PRIVACY.md`. 생성 폴더와 비밀 파일을 제외합니다.
+## 공유
+
+`ACTION_SEND`, `text/plain`으로 결과 글자만 시스템 공유 시트에 넘깁니다. 이미지는 넘기지 않습니다.
+
+## 실행 절차
+
+1. Flutter와 Android SDK가 설치된 환경에서 Android 기기 또는 에뮬레이터를 연결합니다.
+2. `app/` 폴더에서 `flutter pub get`, 이어서 `flutter run`을 실행합니다.
+3. 홈에서 카메라 촬영 또는 갤러리 선택 → 미리보기 → **선택한 이미지 사용** → **이미지 분석하기**를 누릅니다. 결과가 이력에 저장됩니다.
+4. 홈의 **분석 이력 보기**에서 목록을 보고 **공유**, **삭제**를 씁니다.
+5. 재시작 확인: 앱을 완전히 종료했다가 다시 열고 4번을 다시 봅니다.
+
+## 실행 확인
+
+2026-11-10 Android 에뮬레이터(`Resizable_Experimental`)에서 직접 실행했습니다.
+
+| 확인한 것 | 스크린샷 |
+|---|---|
+| 이미지 선택 → 33줄 인식 → 이력 저장 | `screenshots/01_analysis_result.png` |
+| 앱 강제 종료 후 재시작해도 이력 유지 | `screenshots/02_history_after_restart.png` |
+| 시스템 공유 시트에 글자만 전달 | `screenshots/03_system_share_sheet.png` |
+| 항목 삭제 후 빈 목록 | `screenshots/04_history_after_delete.png` |
+
+앱 시작 뒤 `adb shell run-as`로 앱의 `cache/` 폴더를 조회해 이미지 파일이 남지 않은 것도 확인했습니다. 비행기 모드 동작과 빈 이미지 안내는 MP2에서 확인했고 MP3도 같은 분석 경로를 씁니다. 실제 휴대전화 카메라의 촬영 품질은 따로 확인하지 않았습니다.
