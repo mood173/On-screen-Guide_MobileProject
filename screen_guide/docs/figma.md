@@ -4,9 +4,9 @@
   (페이지 `02 · Beta 2 — 세 가지 입력 흐름`, 열람에 Figma 로그인 필요)
 - 추출일: 2026-11-06
 - 코드 연결
-  - 화면 ID ↔ 프레임: `lib/core/screen_id.dart` (`ScreenId.figmaNode`, `ScreenId.figmaUrl`)
-  - 색·글자·모서리·여백: `lib/ui/theme/app_tokens.dart`
-  - Material 테마: `lib/ui/theme/app_theme.dart` (`AppTheme.light()`)
+  - 화면 ID ↔ 프레임: `lib/shared/contracts/screen_id.dart` (`ScreenId.figmaNode`, `ScreenId.figmaUrl`)
+  - 색·글자·모서리·여백: `lib/shared/theme/app_tokens.dart`
+  - Material 테마: `lib/shared/theme/app_theme.dart` (`AppTheme.light()`)
 
 ## 화면 ID ↔ Figma 프레임
 

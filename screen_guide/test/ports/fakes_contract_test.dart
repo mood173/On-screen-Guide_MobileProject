@@ -1,7 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:screen_guide/data/demo_guidance.dart';
-import 'package:screen_guide/data/fakes.dart';
-import 'package:screen_guide/domain/image_input.dart';
+
+import 'package:screen_guide/features/capture/data/fake_image_input.dart';
+import 'package:screen_guide/features/capture/domain/image_input.dart';
+import 'package:screen_guide/features/guidance_map/data/demo_guidance.dart';
+import 'package:screen_guide/features/history/data/in_memory_history_repository.dart';
+import 'package:screen_guide/features/share/data/fake_sharer.dart';
 
 import 'port_contracts.dart';
 

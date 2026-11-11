@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:screen_guide/data/fake_analyzer.dart';
-import 'package:screen_guide/main.dart';
-import 'package:screen_guide/runtime/guide_flow.dart';
+
+import 'package:screen_guide/app/app.dart';
+import 'package:screen_guide/app/guide_flow.dart';
+import 'package:screen_guide/features/analyze/data/fake_analyzer.dart';
 
 void main() {
   testWidgets('홈에서 갤러리 → 샘플 선택 → 분석 → 기능 선택 → 단계 안내 → 완료까지 화면이 넘어간다', (

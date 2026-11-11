@@ -6,9 +6,10 @@
 // 이 파일 이름은 _test.dart로 끝나지 않아서 단독으로 실행되지 않고, 다른 시험 파일이 불러 쓴다.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:screen_guide/domain/guidance.dart';
-import 'package:screen_guide/domain/history.dart';
-import 'package:screen_guide/domain/image_input.dart';
+
+import 'package:screen_guide/features/capture/domain/image_input.dart';
+import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
+import 'package:screen_guide/features/history/domain/history.dart';
 
 void guidanceRepositoryContract(
   String name,

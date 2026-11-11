@@ -47,25 +47,36 @@ H 홈 → G 최근 이미지 → GS 선택 → GR 선택한 이미지 → GA 분
 
 ```
 lib/
-  core/          ActionId, ErrorCode, FlowState, ScreenId     ← 계약 (바꾸기 전 팀 방 공지)
-  contract/      analysis.dart: 채널 요청·응답 형식           ← 계약 v1 JSON과 1:1
-  domain/        포트 = 연결 지점: ScreenAnalyzer(C1), ImageInput(C2), GuidanceRepository(C3),
-                 HistoryRepository(C4), Sharer·MapUpdater(C5·C6)
-  data/          MethodChannelAnalyzer(진짜) / FakeAnalyzer(가짜), fakes.dart(C2~C6 가짜 구현),
-                 demo_guidance.dart(체험용 기능 맵), ImageFiles(샘플 → 캐시 파일), sample_images.dart
-  runtime/       guide_flow.dart: 현재 화면·상태, Gate(화면별 허용 행동), dispatch
-  ui/theme/      Figma 색·글자·모서리·여백, Material 테마
-  ui/cell/       GuideScaffold(툴바·버튼), ScreenImage(원본 좌표 → 화면 좌표로 상자 그리기)
-  ui/screen/     화면 9종 (홈, 갤러리, 확인, 분석 중, 결과, 단계, 완료, 오류)
-  bootstrap.dart 실제/가짜 구현을 고르는 유일한 곳
-assets/samples/  체험용 샘플 이미지
-contract_fixtures/analyze/  채널 요청·응답 예시 JSON (Flutter·Kotlin 공용 시험)
-test/ports/      포트 공용 시험 — 진짜 구현도 같은 시험을 통과해야 bootstrap에서 교체
-android/app/src/main/kotlin/com/screenguide/screen_guide/
-  logic/GuideLogic.kt   화면 식별·대상 찾기·개인정보 정규식 (Android 의존 없음)
-  Analyzer.kt           ML Kit OCR·개체 추출
-  MainActivity.kt       채널 screen_guide/analyze
+  main.dart                  앱 시작 (app/app.dart를 띄운다)
+  app/                       ← 지형주: 흐름 입구·조립·셸
+    bootstrap.dart           실제/가짜 구현을 고르는 유일한 곳 (각자 자기 포트 줄만 수정)
+    guide_flow.dart          현재 화면·상태, Gate(화면별 허용 행동), dispatch
+    app.dart, home_screen.dart   화면 전환 셸, 홈(H)
+  shared/
+    contracts/               ← 공동: ActionId, ErrorCode, FlowState, ScreenId, 채널 요청·응답(analysis.dart)
+    cells/                   ← 지형주: GuideScaffold(툴바·버튼), ScreenImage(원본 좌표 → 화면 좌표)
+    theme/                   ← 지형주: Figma 색·글자·모서리·여백, Material 테마
+  features/<기능>/
+    domain/                  ← 공동: 포트(인터페이스)·모델
+    data/                    ← 최정혁: 포트 구현 (analyze/data만 지형주, 강민준과 협의)
+    ui/                      ← 지형주: 화면
+    capture/       ImageInput · 갤러리(G·GS)·확인(GR) · 샘플 이미지·캐시 복사본
+    analyze/       ScreenAnalyzer · MethodChannelAnalyzer(진짜)/FakeAnalyzer(가짜) · 분석 중(GA)
+    guide/         결과(RG)·단계(D1~D5)·완료(DONE)·오류(E)
+    guidance_map/  GuidanceRepository·MapUpdater · 체험용 기능 맵
+    history/       HistoryRepository · 메모리 구현
+    share/         Sharer · 가짜 구현
+assets/samples/              체험용 샘플 이미지
+contract_fixtures/analyze/   채널 요청·응답 예시 JSON (Flutter·Kotlin 공용 시험)
+test/ports/                  포트 공용 시험(공동) — 진짜 구현도 같은 시험을 통과해야 bootstrap에서 교체
+android/app/src/main/kotlin/com/screenguide/screen_guide/   ← 강민준
+  logic/GuideLogic.kt        화면 식별·대상 찾기·개인정보 정규식 (Android 의존 없음)
+  Analyzer.kt                ML Kit OCR·개체 추출
+  MainActivity.kt            채널 screen_guide/analyze
 ```
+
+폴더 구조와 소유는 Notion「화면길잡이_협업규격_최종」2장 기준이다. 의존 규칙: 기능 안에서 ui·data는 domain만 보고,
+기능끼리는 서로의 domain과 shared/contracts만 본다. 구현 객체를 만드는 곳은 app/bootstrap.dart뿐이다.
 
 규칙: 화면 위젯은 상태를 받아 그리기만 하고, 버튼은 `flow.dispatch(ActionId.xxx)`만 부른다.
 업무 처리와 화면 전환은 `GuideFlow`가 한다.
