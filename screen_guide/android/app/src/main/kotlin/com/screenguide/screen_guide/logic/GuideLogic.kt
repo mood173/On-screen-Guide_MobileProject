@@ -71,9 +71,3 @@ fun merge(all: List<Candidate>, text: String): List<Candidate> {
 fun mask(s: String): String =
     if (s.length <= 4) "*".repeat(s.length)
     else s.take(3) + s.drop(3).dropLast(2).map { if (it.isLetterOrDigit()) '*' else it }.joinToString("") + s.takeLast(2)
-
-// 시험용 기능 맵 (실제 앱에서는 Firebase B01/B02로 배포)
-val SAMPLE_MAPS = listOf(
-    GuidanceMap("settings", listOf("설정", "배터리", "디스플레이")),
-    GuidanceMap("chat", listOf("대화", "보내기")),
-)

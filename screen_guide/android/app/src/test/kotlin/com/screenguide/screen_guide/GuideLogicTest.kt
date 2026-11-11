@@ -48,8 +48,13 @@ class GuideLogicTest {
     }
 
     // ---- 에뮬레이터 1차 시험에서 발견해 추가한 시험 (실제 ML Kit 출력 재현) ----
+    // SAMPLE_MAPS 삭제(K4) → 예시 요청(request_first.json)의 맵과 같은 앵커로 (N5)
+    private val demoMaps = listOf(
+        GuidanceMap("demo.settings", listOf("네트워크 및 인터넷", "알림 설정", "배터리", "디스플레이")),
+        GuidanceMap("demo.chat", listOf("대화", "메시지 입력", "보내기")),
+    )
     @Test fun e01_한줄로_묶인_앵커도_화면식별() =
-        assertEquals("chat", identifyScreen(els("홍길동 대화", "보내기"), SAMPLE_MAPS)?.screenId)
+        assertEquals("demo.chat", identifyScreen(els("홍길동 대화", "보내기"), demoMaps)?.screenId)
     @Test fun e02_ML_Kit가_날짜를_전화로_잡아도_제외() {
         val t = "2026-10-23"
         val c = merge(regexCandidates(t) + Candidate(0, 10, listOf("전화(ML Kit)")), t)
