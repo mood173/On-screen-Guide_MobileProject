@@ -11,6 +11,8 @@ Flutter(지형주)와 Kotlin(강민준)이 **같은 파일**로 시험한다. �
 | response_pii.json | 개인정보 후보 있음, ML Kit 개체 추출 실패(정규식만) | RG에 후보 경고 |
 | response_unknown_screen.json | screenId null | E (UNKNOWN_SCREEN) |
 | response_error.json | 이미지 읽기 실패 | E (IMAGE_READ_FAILED) |
+| response_target_duplicate.json | 단계 안내 중 선택자와 같은 글자가 둘 → target null (추정하지 않음) | E (NO_TARGET) |
+| response_target_fuzzy.json | 단계 안내 중 선택자와 한 글자만 다른 요소 하나 → target match fuzzy | D 화면 (대상 강조) |
 
 - Flutter: `test/shared/contracts/fixtures_test.dart`가 모든 파일을 읽어 DTO로 바꾸고 다시 써서 같은지 확인한다.
 - Kotlin: JUnit에서 `File("../../contract_fixtures/analyze/request_step.json")`(android/app 기준)을 읽어
