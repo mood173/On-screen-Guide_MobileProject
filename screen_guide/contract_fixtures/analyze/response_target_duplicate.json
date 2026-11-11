@@ -1,0 +1,17 @@
+{
+  "requestId": "r6",
+  "status": "ok",
+  "errorCode": null,
+  "imageSize": { "w": 1080, "h": 2340 },
+  "screenId": "demo.settings",
+  "elements": [
+    { "label": "설정", "box": [52, 153, 165, 218] },
+    { "label": "알림 설정", "box": [174, 1029, 341, 1070] },
+    { "label": "배터리", "box": [175, 1220, 290, 1261] },
+    { "label": "알림 설정", "box": [174, 1610, 341, 1651] }
+  ],
+  "target": null,
+  "pii": [],
+  "piiEngine": { "regex": "ok", "mlkit": "ok" },
+  "timingMs": { "ocr": 812, "total": 1964 }
+}

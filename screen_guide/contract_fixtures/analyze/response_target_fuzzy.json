@@ -1,0 +1,17 @@
+{
+  "requestId": "r7",
+  "status": "ok",
+  "errorCode": null,
+  "imageSize": { "w": 1080, "h": 2340 },
+  "screenId": "demo.settings",
+  "elements": [
+    { "label": "설정", "box": [52, 153, 165, 218] },
+    { "label": "알림 설장", "box": [174, 1029, 341, 1070] },
+    { "label": "배터리", "box": [175, 1220, 290, 1261] },
+    { "label": "디스플레이", "box": [156, 1790, 390, 1841] }
+  ],
+  "target": { "label": "알림 설장", "box": [174, 1029, 341, 1070], "match": "fuzzy" },
+  "pii": [],
+  "piiEngine": { "regex": "ok", "mlkit": "ok" },
+  "timingMs": { "ocr": 845, "total": 2010 }
+}
