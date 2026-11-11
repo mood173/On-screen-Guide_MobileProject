@@ -83,7 +83,7 @@ private const val ND_AFTER = """(?!\d)"""
 val KR_PATTERNS = mapOf(
     "주민·외국인등록번호" to Regex(ND_BEFORE + """\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])-?[1-8]\d{6}""" + ND_AFTER),
     "휴대전화"            to Regex(ND_BEFORE + """01[016789]-?\d{3,4}-?\d{4}""" + ND_AFTER),
-    "유선전화"            to Regex(ND_BEFORE + """0(2|[3-6][1-5])-?\d{3,4}-?\d{4}""" + ND_AFTER),
+    "유선전화"            to Regex(ND_BEFORE + """0(2|[3-6][1-5]|70)-?\d{3,4}-?\d{4}""" + ND_AFTER),   // 070: 인터넷전화
     "계좌번호 추정"       to Regex(ND_BEFORE + """\d{2,6}-\d{2,6}-\d{2,8}(-\d{1,6})?""" + ND_AFTER),
 )
 val DATE = Regex("""(19|20)\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])""")
