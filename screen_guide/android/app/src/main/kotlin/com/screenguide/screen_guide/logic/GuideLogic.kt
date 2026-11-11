@@ -7,7 +7,7 @@ data class Box(val left: Int, val top: Int, val right: Int, val bottom: Int)
 data class OcrLine(val text: String, val box: Box?)
 data class UiElement(val label: String, val box: Box)
 data class GuidanceMap(val screenId: String, val screenAnchors: List<String>)
-data class Candidate(val start: Int, val end: Int, val types: List<String>)
+data class Candidate(val start: Int, val end: Int, val type: String)   // type: PII_TYPES 중 하나
 
 // 채널 응답에 실리는 결과 (계약 v1: target.match, pii[])
 enum class MatchKind(val wire: String) { EXACT("exact"), FUZZY("fuzzy") }
@@ -71,32 +71,60 @@ fun findTarget(elements: List<UiElement>, selector: String): TargetMatch? {
 }
 
 // ---------- F03 ----------
+// R5: 개인정보 유형은 이 9개 중 하나 (협업규격_최종 3.3, analysis.dart piiTypes). 엔진 이름을 붙이지 않는다.
+// 목록 순서가 우선순위다: 한국 형식 정규식 4개가 ML Kit 유형 5개보다 앞이고, 전화 형식이 계좌 추정보다 앞이다.
+val PII_TYPES = listOf("주민·외국인등록번호", "휴대전화", "유선전화", "계좌번호 추정", "전화", "이메일", "주소", "카드", "URL")
+
+// R4: \b 대신 "앞뒤가 숫자가 아님"((?<!\d) … (?!\d)). \b 는 한글·영문과 숫자 사이를 경계로 보는지가
+// JVM 버전·Android 엔진마다 달라서(N2) JUnit 통과가 기기 동작을 보장하지 못했다.
+// 이제 숫자열 안쪽에서 시작하거나 끝나는 것만 막고, 한글·영문·기호와 붙은 번호는 잡는다.
+private const val ND_BEFORE = """(?<!\d)"""
+private const val ND_AFTER = """(?!\d)"""
 val KR_PATTERNS = mapOf(
-    "주민·외국인등록번호" to Regex("""\b\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])-?[1-8]\d{6}\b"""),
-    "휴대전화"            to Regex("""\b01[016789]-?\d{3,4}-?\d{4}\b"""),
-    "유선전화"            to Regex("""\b0(2|[3-6][1-5])-?\d{3,4}-?\d{4}\b"""),
-    "계좌번호 추정"       to Regex("""\b\d{2,6}-\d{2,6}-\d{2,8}(-\d{1,6})?\b"""),
+    "주민·외국인등록번호" to Regex(ND_BEFORE + """\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])-?[1-8]\d{6}""" + ND_AFTER),
+    "휴대전화"            to Regex(ND_BEFORE + """01[016789]-?\d{3,4}-?\d{4}""" + ND_AFTER),
+    "유선전화"            to Regex(ND_BEFORE + """0(2|[3-6][1-5])-?\d{3,4}-?\d{4}""" + ND_AFTER),
+    "계좌번호 추정"       to Regex(ND_BEFORE + """\d{2,6}-\d{2,6}-\d{2,8}(-\d{1,6})?""" + ND_AFTER),
 )
 val DATE = Regex("""(19|20)\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])""")
 
 fun regexCandidates(text: String) = KR_PATTERNS.flatMap { (kind, re) ->
-    re.findAll(text).map { Candidate(it.range.first, it.range.last + 1, listOf(kind)) } }
+    re.findAll(text).map { Candidate(it.range.first, it.range.last + 1, kind) } }
 
 // 1) 위치가 겹치는 후보를 하나로 합친다(ML Kit이 주민번호 뒷자리를 전화로 따로 잡는 경우 등)
-// 2) 한국 형식 정규식 유형이 있으면 그것을 우선하고, ML Kit 유형은 정규식이 못 잡은 경우에만 쓴다
-// 3) 전화번호 형식이면 계좌 후보에서 빼고, 날짜 형식은 어느 쪽이 잡았든 제외한다
+// 2) 합친 후보의 유형은 PII_TYPES 순서로 가장 앞의 것 하나 (R5). 그래서
+//    - 한국 형식 정규식 유형이 있으면 그것, ML Kit 유형은 정규식이 못 잡은 경우에만 쓴다
+//    - 전화 형식(휴대·유선)과 계좌 추정이 겹치면 전화
+//    - 9개 밖의 유형만 있는 후보는 버린다
+// 3) 날짜 형식은 어느 쪽이 잡았든 제외한다
 fun merge(all: List<Candidate>, text: String): List<Candidate> {
-    val groups = mutableListOf<Candidate>()
+    data class Group(val start: Int, var end: Int, val types: MutableSet<String>)
+    val groups = mutableListOf<Group>()
     for (c in all.sortedBy { it.start }) {
         val last = groups.lastOrNull()
-        if (last != null && c.start < last.end)
-            groups[groups.size - 1] = Candidate(last.start, maxOf(last.end, c.end), (last.types + c.types).distinct())
-        else groups += c
+        if (last != null && c.start < last.end) { last.end = maxOf(last.end, c.end); last.types += c.type }
+        else groups += Group(c.start, c.end, mutableSetOf(c.type))
     }
-    return groups
-        .map { c -> val kr = c.types.filter { it in KR_PATTERNS.keys }; if (kr.isNotEmpty()) c.copy(types = kr) else c }
-        .map { c -> if (c.types.any { it.endsWith("전화") }) c.copy(types = c.types - "계좌번호 추정") else c }
-        .filterNot { c -> DATE.matches(text.substring(c.start, c.end)) }
+    return groups.mapNotNull { g ->
+        val type = g.types.filter { it in PII_TYPES }.minByOrNull { PII_TYPES.indexOf(it) } ?: return@mapNotNull null
+        Candidate(g.start, g.end, type)
+    }.filterNot { c -> DATE.matches(text.substring(c.start, c.end)) }
+}
+
+// 요소 글자를 "\n"으로 이어 붙인 글. 정규식과 ML Kit 개체 추출이 이 글 하나를 본다.
+fun joinLabels(elements: List<UiElement>) = elements.joinToString("\n") { it.label }
+
+// 후보마다 몇 번째 요소에 들어 있는지(elementIndex)와 가린 값을 계산한다.
+// extra: ML Kit 후보 (joinLabels 글 기준 위치). 후보가 줄을 넘어가면 시작한 요소 안까지만 가린다.
+fun piiHits(elements: List<UiElement>, extra: List<Candidate> = emptyList()): List<PiiHit> {
+    if (elements.isEmpty()) return emptyList()
+    val text = joinLabels(elements)
+    val starts = elements.runningFold(0) { acc, e -> acc + e.label.length + 1 }.dropLast(1)   // 요소별 시작 위치
+    return merge(regexCandidates(text) + extra, text).map { c ->
+        val idx = starts.indexOfLast { it <= c.start }
+        val end = minOf(c.end, starts[idx] + elements[idx].label.length)
+        PiiHit(c.type, mask(text.substring(c.start, end)), idx)
+    }
 }
 
 // 앞 3자·뒤 2자만 남기고 글자·숫자를 가린다(이메일 포함). 구분 기호(-, @, .)는 형식을 알아보도록 남긴다

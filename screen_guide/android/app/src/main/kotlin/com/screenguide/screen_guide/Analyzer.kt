@@ -38,26 +38,22 @@ class Analyzer(private val context: Context) {
                 val elements = toUiElements(lines)
                 val screen = identifyScreen(elements, req.screens)
                 val target = req.selector?.let { findTarget(elements, it) }
-                val fullText = elements.joinToString("\n") { it.label }
+                val fullText = joinLabels(elements)
 
                 Log.i(tag, "OCR ${tOcr}ms, lines=${elements.size}, screen=${screen?.screenId}, target=${target?.match}")
                 elements.forEach { Log.i(tag, "  [${it.box.left},${it.box.top},${it.box.right},${it.box.bottom}] ${it.label}") }
 
-                runEntityExtraction(fullText) { mlkit, status ->
-                    val merged = merge(regexCandidates(fullText) + mlkit, fullText).sortedBy { it.start }
-                    val starts = elements.runningFold(0) { acc, e -> acc + e.label.length + 1 }
-                    val pii = merged.map { c ->
-                        val idx = starts.indexOfLast { it <= c.start }.coerceIn(0, elements.lastIndex)
-                        PiiHit(c.types.first(), mask(fullText.substring(c.start, c.end)), idx)
-                    }
+                runEntityExtraction(fullText) { mlkit, mlkitOk ->
+                    val pii = piiHits(elements, mlkit)
                     val total = SystemClock.elapsedRealtime() - t0
-                    Log.i(tag, "privacy=${merged.size} (entity: $status), total ${total}ms")
+                    Log.i(tag, "privacy=${pii.size} (mlkit ok=$mlkitOk), total ${total}ms")
+                    pii.forEach { Log.i(tag, "  ${it.type} : ${it.masked}") }
                     onDone(ChannelCodec.encode(AnalyzeResult(
                         requestId = req.requestId, width = image.width, height = image.height,
                         screenId = screen?.screenId,
                         elements = elements,
                         target = target,
-                        pii = pii, regexOk = true, mlkitOk = status == "ok",
+                        pii = pii, regexOk = true, mlkitOk = mlkitOk,
                         ocrMs = tOcr, totalMs = total,
                     )))
                 }
@@ -66,10 +62,11 @@ class Analyzer(private val context: Context) {
     }
 
     // ML Kit 개체 추출. 모델이 없거나(오프라인 첫 실행) 실패하면 정규식 결과만 쓴다.
-    private fun runEntityExtraction(text: String, done: (List<Candidate>, String) -> Unit) {
+    // done(후보, ok 여부): ok가 아니면(시간 초과·모델 없음·추출 실패) 모두 failed (K9)
+    private fun runEntityExtraction(text: String, done: (List<Candidate>, Boolean) -> Unit) {
         var finished = false
-        fun finish(c: List<Candidate>, s: String) { if (!finished) { finished = true; done(c, s) } }
-        main.postDelayed({ finish(emptyList(), "timeout") }, 8000)
+        fun finish(c: List<Candidate>, ok: Boolean) { if (!finished) { finished = true; done(c, ok) } }
+        main.postDelayed({ finish(emptyList(), false) }, 8000)
 
         extractor.downloadModelIfNeeded()
             .addOnSuccessListener {
@@ -79,16 +76,18 @@ class Analyzer(private val context: Context) {
                     .build()
                 extractor.annotate(params)
                     .addOnSuccessListener { list ->
-                        finish(list.map { a -> Candidate(a.start, a.end, a.entities.map { typeName(it.type) }) }, "ok")
+                        finish(list.flatMap { a -> a.entities.mapNotNull { e ->
+                            typeName(e.type)?.let { Candidate(a.start, a.end, it) } } }, true)
                     }
-                    .addOnFailureListener { finish(emptyList(), "annotate_failed") }
+                    .addOnFailureListener { finish(emptyList(), false) }
             }
-            .addOnFailureListener { finish(emptyList(), "model_unavailable") }
+            .addOnFailureListener { finish(emptyList(), false) }
     }
 
-    private fun typeName(t: Int) = when (t) {
-        Entity.TYPE_PHONE -> "전화(ML Kit)"; Entity.TYPE_EMAIL -> "이메일(ML Kit)"
-        Entity.TYPE_ADDRESS -> "주소(ML Kit)"; Entity.TYPE_PAYMENT_CARD -> "카드(ML Kit)"
-        Entity.TYPE_URL -> "URL(ML Kit)"; else -> "기타(ML Kit)"
+    // R5: 엔진 이름을 붙이지 않는다. 9개 밖의 유형은 버린다.
+    private fun typeName(t: Int): String? = when (t) {
+        Entity.TYPE_PHONE -> "전화"; Entity.TYPE_EMAIL -> "이메일"
+        Entity.TYPE_ADDRESS -> "주소"; Entity.TYPE_PAYMENT_CARD -> "카드"
+        Entity.TYPE_URL -> "URL"; else -> null
     }
 }
