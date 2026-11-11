@@ -51,7 +51,7 @@ class HomeScreen extends StatelessWidget {
                         iconColor: AppColors.primary,
                         title: '카메라 촬영',
                         subtitle: '다른 기기의 화면을 찍어서 안내받기',
-                        onTap: () => flow.dispatch(ActionId.captureCamera),
+                        onTap: _on(flow, ActionId.captureCamera),
                       ),
                       const SizedBox(height: 16),
                       _InputTile(
@@ -61,7 +61,7 @@ class HomeScreen extends StatelessWidget {
                         iconColor: AppColors.tileGalleryIcon,
                         title: '갤러리에서 선택',
                         subtitle: '저장한 스크린샷이나 사진 불러오기',
-                        onTap: () => flow.dispatch(ActionId.captureGallery),
+                        onTap: _on(flow, ActionId.captureGallery),
                       ),
                       const SizedBox(height: 16),
                       _InputTile(
@@ -71,7 +71,7 @@ class HomeScreen extends StatelessWidget {
                         iconColor: AppColors.tileLiveIcon,
                         title: '화면 실시간 스캔',
                         subtitle: '다른 앱 위에서 바로 안내받기',
-                        onTap: () => flow.dispatch(ActionId.overlaySetup),
+                        onTap: _on(flow, ActionId.overlaySetup),
                       ),
                     ],
                   ),
@@ -183,7 +183,7 @@ class _InputTile extends StatelessWidget {
   final IconData icon;
   final Color tile, iconColor;
   final String title, subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -238,7 +238,7 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget item(String label, bool active, VoidCallback onTap) => Expanded(
+    Widget item(String label, bool active, VoidCallback? onTap) => Expanded(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
@@ -262,15 +262,15 @@ class _BottomNav extends StatelessWidget {
       ),
       child: Row(
         children: [
-          item('⌂  홈', true, () {}),
-          item('◷  기록', false, () => flow.dispatch(ActionId.historyOpen)),
-          item(
-            '⚙  설정',
-            false,
-            () => flow.dispatch(ActionId.settingsOpenPermission),
-          ),
+          item('⌂  홈', true, null),
+          item('◷  기록', false, _on(flow, ActionId.navHistory)),
+          item('⚙  설정', false, _on(flow, ActionId.navSettings)),
         ],
       ),
     );
   }
 }
+
+/// 관문이 허용할 때만 눌리는 버튼 동작 (허용하지 않으면 null → 비활성)
+VoidCallback? _on(GuideFlow flow, ActionId id) =>
+    flow.allows(id) ? () => flow.dispatch(id) : null;

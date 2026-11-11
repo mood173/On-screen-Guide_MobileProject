@@ -67,6 +67,9 @@ class GuideFlow extends ChangeNotifier {
   ScreenId screen = ScreenId.h;
   FlowState state = FlowState.idle;
 
+  /// 이번 세션의 입력 방식 (갤러리·카메라). 복구 화면의 버튼과 기록에 쓴다.
+  InputKind? input;
+
   /// G: 최근 사진 목록
   List<GalleryItem> galleryItems = const [];
 
@@ -117,12 +120,13 @@ class GuideFlow extends ChangeNotifier {
   // ───────────── Gate: 화면별로 허용하는 행동 ─────────────
   static const _always = {ActionId.navBack, ActionId.navHome};
   static const _gate = <ScreenId, Set<ActionId>>{
+    // 대기 (시스템설계_최종 3-2)
     ScreenId.h: {
       ActionId.captureGallery,
       ActionId.captureCamera,
       ActionId.overlaySetup,
-      ActionId.historyOpen,
-      ActionId.settingsOpenPermission,
+      ActionId.navHistory,
+      ActionId.navSettings,
     },
     ScreenId.g: {ActionId.capturePick},
     ScreenId.gs: {
@@ -132,21 +136,19 @@ class GuideFlow extends ChangeNotifier {
     },
     ScreenId.gr: {ActionId.analyzeRun, ActionId.captureRetake},
     ScreenId.ga: {ActionId.analyzeCancel},
-    ScreenId.rg: {
-      ActionId.guideStart,
-      ActionId.sharePrepare,
-      ActionId.historySave,
-    },
+    // 선택: 저장·공유는 열지 않는다 (기능별_검토_결론 13장 X1)
+    ScreenId.rg: {ActionId.guideStart, ActionId.captureRetake},
     ScreenId.d1: _stepActions,
     ScreenId.d2: _stepActions,
     ScreenId.d3: _stepActions,
     ScreenId.d4: _stepActions,
     ScreenId.d5: _stepActions,
     ScreenId.done: {ActionId.historySave, ActionId.sharePrepare},
+    // 복구 (시스템설계_최종 3-9). 화면은 세션의 입력 방식에 맞는 버튼만 보여 준다
     ScreenId.e: {
       ActionId.captureRetake,
       ActionId.captureCamera,
-      ActionId.overlayRescan,
+      ActionId.captureGallery,
     },
   };
   static const _stepActions = {
@@ -208,6 +210,7 @@ class GuideFlow extends ChangeNotifier {
 
   // ───────────── 입력 (갤러리) ─────────────
   Future<void> _openGallery() async {
+    input = InputKind.gallery;
     final access = await _gallery.requestAccess();
     if (access != PickStatus.ok) return _fail(ErrorCode.permissionDenied);
     galleryItems = await _gallery.recent();
@@ -363,7 +366,7 @@ class GuideFlow extends ChangeNotifier {
         actionId: a.actionId,
         actionTitle: a.title,
         stepInstructions: [for (final s in a.steps) s.instruction],
-        input: picked?.input ?? InputKind.gallery,
+        input: picked?.input ?? input ?? InputKind.gallery,
         createdAt: at,
         piiTypes: [
           for (final p in result?.pii ?? const <PiiCandidate>[]) p.type,
@@ -419,6 +422,7 @@ class GuideFlow extends ChangeNotifier {
     _pendingId = null;
     _slowTimer?.cancel();
     await _releasePicked();
+    input = null;
     galleryItems = const [];
     selectedId = null;
     result = null;

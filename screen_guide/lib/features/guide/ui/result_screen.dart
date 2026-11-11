@@ -19,13 +19,15 @@ class ResultScreen extends StatelessWidget {
     final img = flow.picked!;
     final r = flow.result!;
     final actions = flow.availableActions;
+    VoidCallback? on(ActionId id, [Object? arg]) =>
+        flow.allows(id) ? () => flow.dispatch(id, arg) : null;
     return GuideScaffold(
       title: '분석 결과',
       onBack: () => flow.dispatch(ActionId.navBack),
       body: [
         ScreenHeading(
           '무엇을 하고 싶으세요?',
-          '버튼과 메뉴 ${r.elements.length}개를 찾았어요  ·  ${r.totalMs}ms',
+          '글자 ${r.elements.length}개를 읽었어요  ·  ${r.totalMs}ms',
         ),
         ScreenImage(
           path: img.path!,
@@ -54,6 +56,11 @@ class ResultScreen extends StatelessWidget {
             ),
           ),
         const Text('추천 기능', style: AppText.section),
+        if (actions.isEmpty)
+          const WhiteCard(
+            key: ValueKey('no-actions'),
+            child: Text('이 화면에서 안내할 수 있는 기능이 아직 없어요', style: AppText.body),
+          ),
         for (final a in actions)
           Material(
             color: AppColors.surface,
@@ -61,7 +68,7 @@ class ResultScreen extends StatelessWidget {
             child: InkWell(
               key: ValueKey('action-${a.actionId}'),
               borderRadius: BorderRadius.circular(AppRadius.card),
-              onTap: () => flow.dispatch(ActionId.guideStart, a),
+              onTap: on(ActionId.guideStart, a),
               child: Padding(
                 padding: const EdgeInsets.all(AppSpace.cardPad + 2),
                 child: Row(
@@ -89,11 +96,10 @@ class ResultScreen extends StatelessWidget {
             ),
           ),
       ],
+      // "결과 저장 및 공유"는 이번에 넣지 않는다 (기능별_검토_결론 13장 X1: 기능을 고르기 전에는 공유할 사용 방법이 없다)
       footer: [
-        SecondaryAction(
-          '결과 저장 및 공유',
-          onPressed: () => flow.dispatch(ActionId.sharePrepare),
-        ),
+        if (actions.isEmpty)
+          PrimaryAction('다른 이미지 선택', onPressed: on(ActionId.captureRetake)),
       ],
     );
   }

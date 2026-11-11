@@ -95,7 +95,9 @@ class _AnalyzingScreenState extends State<AnalyzingScreen>
         if (flow.slow) PrimaryAction('계속 기다리기', onPressed: () {}),
         SecondaryAction(
           '분석 취소',
-          onPressed: () => flow.dispatch(ActionId.analyzeCancel),
+          onPressed: flow.allows(ActionId.analyzeCancel)
+              ? () => flow.dispatch(ActionId.analyzeCancel)
+              : null,
         ),
       ],
     );

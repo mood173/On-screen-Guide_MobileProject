@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:screen_guide/app/guide_flow.dart';
+import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/shared/cells/guide_scaffold.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/contracts/error_code.dart';
@@ -25,12 +26,19 @@ class ErrorScreen extends StatelessWidget {
       '파일이 손상되었을 수 있어요. 다른 이미지를 골라 주세요.',
     ),
     ErrorCode.noPath => ('이미지를 찾을 수 없어요', '다른 이미지를 골라 주세요.'),
+    ErrorCode.permissionDenied => (
+      '사진에 접근할 수 없어요',
+      '기기 설정에서 이 앱의 사진 접근을 허용해 주세요.',
+    ),
     _ => ('분석하지 못했어요', '잠시 후 다시 시도해 주세요.'),
   };
 
   @override
   Widget build(BuildContext context) {
     final (title, tip) = _copy(flow.error);
+    final camera = flow.input == InputKind.camera;
+    VoidCallback? on(ActionId id) =>
+        flow.allows(id) ? () => flow.dispatch(id) : null;
     return GuideScaffold(
       title: '다시 시도',
       onBack: () => flow.dispatch(ActionId.navBack),
@@ -52,7 +60,7 @@ class ErrorScreen extends StatelessWidget {
           ),
         ),
         Text(
-          '다시 촬영해 주세요',
+          camera ? '다시 촬영해 주세요' : '다시 골라 주세요',
           textAlign: TextAlign.center,
           style: AppText.headline.copyWith(fontSize: 25),
         ),
@@ -73,20 +81,19 @@ class ErrorScreen extends StatelessWidget {
           style: AppText.caption,
         ),
       ],
-      footer: [
-        PrimaryAction(
-          '다시 촬영',
-          onPressed: () => flow.dispatch(ActionId.captureCamera),
-        ),
-        SecondaryAction(
-          '다른 이미지 선택',
-          onPressed: () => flow.dispatch(ActionId.captureRetake),
-        ),
-        SecondaryAction(
-          '현재 앱 화면 다시 스캔',
-          onPressed: () => flow.dispatch(ActionId.overlayRescan),
-        ),
-      ],
+      // 세션의 입력 방식에 맞는 복구 버튼만 (기능별_검토_결론 8장). 실시간 다시 스캔은 오버레이가 붙을 때.
+      footer: camera
+          ? [
+              PrimaryAction('다시 촬영', onPressed: on(ActionId.captureCamera)),
+              SecondaryAction(
+                '갤러리에서 고르기',
+                onPressed: on(ActionId.captureGallery),
+              ),
+            ]
+          : [
+              PrimaryAction('다른 이미지 선택', onPressed: on(ActionId.captureRetake)),
+              SecondaryAction('처음으로', onPressed: on(ActionId.navHome)),
+            ],
     );
   }
 }

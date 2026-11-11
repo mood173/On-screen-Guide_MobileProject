@@ -283,6 +283,37 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(cleanup.cleared, 1);
   });
+
+  test('관문: 홈 탭은 화면 이동 ID, 결과 화면에서는 저장·공유를 열지 않는다', () async {
+    final f = _flow();
+    expect(f.allows(ActionId.navHistory), isTrue);
+    expect(f.allows(ActionId.navSettings), isTrue);
+    expect(
+      f.allows(ActionId.historyOpen),
+      isFalse,
+      reason: '기록 한 건 열기는 기록 화면에서',
+    );
+    expect(f.allows(ActionId.settingsOpenPermission), isFalse);
+
+    await _pickSample(f, SampleImage.settings);
+    await f.dispatch(ActionId.analyzeRun);
+    expect(f.screen, ScreenId.rg);
+    expect(f.allows(ActionId.sharePrepare), isFalse, reason: 'X1');
+    expect(f.allows(ActionId.historySave), isFalse, reason: 'X1');
+    expect(f.allows(ActionId.captureRetake), isTrue);
+  });
+
+  test('복구: 갤러리 세션의 오류 화면은 다시 고르기로 목록에 돌아간다', () async {
+    final f = await _toResult(
+      SampleImage.settings,
+      FakeAnalyzer(delay: Duration.zero, failWith: ErrorCode.analysisFailed),
+    );
+    expect(f.screen, ScreenId.e);
+    expect(f.input, InputKind.gallery);
+    expect(f.allows(ActionId.overlayRescan), isFalse);
+    await f.dispatch(ActionId.captureRetake);
+    expect(f.screen, ScreenId.g);
+  });
 }
 
 class _RecordingCleanup implements InputCleanup {

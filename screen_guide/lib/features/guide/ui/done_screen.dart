@@ -64,11 +64,15 @@ class DoneScreen extends StatelessWidget {
       footer: [
         PrimaryAction(
           '안내 기록에 저장',
-          onPressed: () => flow.dispatch(ActionId.historySave),
+          onPressed: flow.allows(ActionId.historySave)
+              ? () => flow.dispatch(ActionId.historySave)
+              : null,
         ),
         SecondaryAction(
           '새로운 화면 안내받기',
-          onPressed: () => flow.dispatch(ActionId.navHome),
+          onPressed: flow.allows(ActionId.navHome)
+              ? () => flow.dispatch(ActionId.navHome)
+              : null,
         ),
       ],
     );
