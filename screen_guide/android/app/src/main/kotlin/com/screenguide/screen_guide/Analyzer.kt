@@ -40,7 +40,7 @@ class Analyzer(private val context: Context) {
                 val target = req.selector?.let { findTarget(elements, it) }
                 val fullText = elements.joinToString("\n") { it.label }
 
-                Log.i(tag, "OCR ${tOcr}ms, lines=${elements.size}, screen=${screen?.screenId}, target=${target?.label}")
+                Log.i(tag, "OCR ${tOcr}ms, lines=${elements.size}, screen=${screen?.screenId}, target=${target?.match}")
                 elements.forEach { Log.i(tag, "  [${it.box.left},${it.box.top},${it.box.right},${it.box.bottom}] ${it.label}") }
 
                 runEntityExtraction(fullText) { mlkit, status ->
@@ -56,7 +56,7 @@ class Analyzer(private val context: Context) {
                         requestId = req.requestId, width = image.width, height = image.height,
                         screenId = screen?.screenId,
                         elements = elements,
-                        target = target?.let { TargetMatch(it, if (norm(it.label) == norm(req.selector!!)) MatchKind.EXACT else MatchKind.FUZZY) },
+                        target = target,
                         pii = pii, regexOk = true, mlkitOk = status == "ok",
                         ocrMs = tOcr, totalMs = total,
                     )))
