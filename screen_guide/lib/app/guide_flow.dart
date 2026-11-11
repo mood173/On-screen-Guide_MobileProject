@@ -6,17 +6,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:screen_guide/features/analyze/domain/screen_analyzer.dart';
-import 'package:screen_guide/features/capture/data/fake_input.dart';
-import 'package:screen_guide/features/capture/data/image_files.dart';
-import 'package:screen_guide/features/capture/data/sample_images.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
-import 'package:screen_guide/features/guidance_map/data/demo_guidance.dart';
-import 'package:screen_guide/features/guidance_map/data/fake_map_updater.dart';
 import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
 import 'package:screen_guide/features/guidance_map/domain/map_updater.dart';
-import 'package:screen_guide/features/history/data/in_memory_history_repository.dart';
 import 'package:screen_guide/features/history/domain/history.dart';
-import 'package:screen_guide/features/share/data/fake_sharer.dart';
 import 'package:screen_guide/features/share/domain/sharer.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/contracts/analysis.dart';
@@ -24,51 +17,48 @@ import 'package:screen_guide/shared/contracts/error_code.dart';
 import 'package:screen_guide/shared/contracts/flow_state.dart';
 import 'package:screen_guide/shared/contracts/screen_id.dart';
 
-/// 흐름 관리자 (설계 6.1 4층 런타임·관문 + 5층 기능).
+/// 흐름 입구 (시스템설계_최종 6-2).
 ///
-/// 화면(셀)은 [dispatch]로 [ActionId]만 올린다. 여기서 Gate([allowed])를 통과한 행동만 처리하고,
+/// 화면(셀)은 [dispatch]로 [ActionId]만 올린다. 여기서 관문([allowed])을 통과한 행동만 처리하고,
 /// 결과를 상태로 바꿔 [notifyListeners]로 알린다. 화면은 상태를 보고 다시 그리기만 한다.
+///
+/// 흐름은 포트(인터페이스)만 안다. 구현은 app/bootstrap.dart와 시험 코드가 생성자로 넘긴다 (협업규격_최종 2장).
 class GuideFlow extends ChangeNotifier {
   GuideFlow({
     required ScreenAnalyzer analyzer,
-    GuidanceRepository guidance = const DemoGuidanceRepository(),
-    HistoryRepository? history,
-    ImageFiles files = const AssetPathImageFiles(),
-    GalleryInput? galleryInput,
-    CameraInput? cameraInput,
-    InputCleanup? inputCleanup,
-    Sharer? sharer,
-    MapUpdater? mapUpdater,
+    required GuidanceRepository guidance,
+    required HistoryRepository history,
+    required GalleryInput galleryInput,
+    required CameraInput cameraInput,
+    required InputCleanup inputCleanup,
+    required Sharer sharer,
+    required MapUpdater mapUpdater,
     this.slowAfter = const Duration(seconds: 3),
+    DateTime Function() now = DateTime.now,
   }) : _analyzer = analyzer,
        _guidance = guidance,
-       _history = history ?? InMemoryHistoryRepository(),
-       _files = files,
-       galleryInput = galleryInput ?? FakeGalleryInput(files: files),
-       cameraInput = cameraInput ?? FakeCameraInput(files: files),
-       inputCleanup = inputCleanup ?? FakeInputCleanup(files: files),
-       sharer = sharer ?? FakeSharer(),
-       mapUpdater = mapUpdater ?? FakeMapUpdater();
+       _history = history,
+       _gallery = galleryInput,
+       _camera = cameraInput,
+       _cleanup = inputCleanup,
+       _sharer = sharer,
+       _mapUpdater = mapUpdater,
+       _now = now;
 
-  // ── 연결 지점 (포트). 구현은 bootstrap.dart가 고른다. ──
-  final ScreenAnalyzer _analyzer; // 팀원 1 (Kotlin 채널)
-  final GuidanceRepository _guidance; // 팀원 3 (기능 맵)
-  final HistoryRepository _history; // 팀원 3 (이력)
-  final ImageFiles _files; // 체험용 샘플 → 파일 경로
+  // ── 연결 지점 (포트) ──
+  final ScreenAnalyzer _analyzer; // 강민준 (Kotlin 채널)
+  final GuidanceRepository _guidance; // 최정혁 (기능 맵)
+  final HistoryRepository _history; // 최정혁 (기록)
+  final GalleryInput _gallery; // 최정혁 (사진 가져오기)
+  // ignore: unused_field
+  final CameraInput _camera; // 최정혁 — 카메라 장면(CP)을 만들 때 사용
+  final InputCleanup _cleanup; // 최정혁
+  // ignore: unused_field
+  final Sharer _sharer; // 최정혁 — 공유(P → SHARE)를 만들 때 사용
+  final MapUpdater _mapUpdater; // 최정혁
 
-  /// 사진 가져오기 (최정혁). 갤러리·카메라 장면, 세션 정리에서 사용.
-  final GalleryInput galleryInput;
-  final CameraInput cameraInput;
-  final InputCleanup inputCleanup;
-
-  /// 팀원 3 (share_plus). 2~3주차 P → SHARE 화면에서 사용.
-  final Sharer sharer;
-
-  /// 팀원 3 (Firebase B01/B02). 4주차 앱 시작 시 mapCheck에서 사용.
-  final MapUpdater mapUpdater;
-
-  /// 분석 요청에 넣는 파일 경로 (앱 캐시에 만든 복사본)
-  String? _imagePath;
+  /// 기록 시각 (시험에서 고정할 수 있게 주입)
+  final DateTime Function() _now;
 
   /// 이 시간이 지나도 분석이 끝나지 않으면 [slow]를 켠다 (계약 v1 결정 3: 오류로 끊지 않음).
   final Duration slowAfter;
@@ -77,8 +67,14 @@ class GuideFlow extends ChangeNotifier {
   ScreenId screen = ScreenId.h;
   FlowState state = FlowState.idle;
 
-  /// G·GS에서 고른 이미지
-  SampleImage? picked;
+  /// G: 최근 사진 목록
+  List<GalleryItem> galleryItems = const [];
+
+  /// GS: 목록에서 고른 칸
+  String? selectedId;
+
+  /// 가져온 사진 (앱 복사본). 세션이 끝날 때 [InputCleanup.release]로 지운다.
+  PickedImage? picked;
 
   /// 첫 분석 결과 (RG)
   AnalysisResult? result;
@@ -110,6 +106,14 @@ class GuideFlow extends ChangeNotifier {
   int get totalSteps => action?.steps.length ?? 0;
   GuideStep? get currentStep => action?.steps[step];
 
+  // ───────────── 준비 단계 (앱 시작) ─────────────
+
+  /// 앱 시작 때 한 번. 남은 복사본 청소와 맵 갱신 확인을 시작하고 결과를 기다리지 않는다 (협업규격_최종 3.4).
+  void start() {
+    unawaited(_cleanup.clearLeftovers());
+    unawaited(_mapUpdater.checkForUpdate());
+  }
+
   // ───────────── Gate: 화면별로 허용하는 행동 ─────────────
   static const _always = {ActionId.navBack, ActionId.navHome};
   static const _gate = <ScreenId, Set<ActionId>>{
@@ -120,8 +124,12 @@ class GuideFlow extends ChangeNotifier {
       ActionId.historyOpen,
       ActionId.settingsOpenPermission,
     },
-    ScreenId.g: {ActionId.captureGallery},
-    ScreenId.gs: {ActionId.captureGallery, ActionId.captureRetake},
+    ScreenId.g: {ActionId.capturePick},
+    ScreenId.gs: {
+      ActionId.capturePick,
+      ActionId.captureConfirm,
+      ActionId.captureRetake,
+    },
     ScreenId.gr: {ActionId.analyzeRun, ActionId.captureRetake},
     ScreenId.ga: {ActionId.analyzeCancel},
     ScreenId.rg: {
@@ -162,11 +170,13 @@ class GuideFlow extends ChangeNotifier {
     if (!allows(id)) return;
     switch (id) {
       case ActionId.captureGallery:
-        await _gallery(arg);
+        await _openGallery();
+      case ActionId.capturePick:
+        if (arg is String) _pick(arg);
+      case ActionId.captureConfirm:
+        await _confirm();
       case ActionId.captureRetake:
-        _go(ScreenId.g, FlowState.idle);
-        picked = null;
-        _releaseFile();
+        await _retake();
       case ActionId.analyzeRun:
         await _analyzeFirst();
       case ActionId.analyzeCancel:
@@ -183,9 +193,9 @@ class GuideFlow extends ChangeNotifier {
       case ActionId.guideMismatch:
         await _locate(); // 같은 기능 ID를 유지한 채 현재 화면을 다시 분석
       case ActionId.navBack:
-        _back();
+        await _back();
       case ActionId.navHome:
-        _reset();
+        await _reset();
       case ActionId.historySave:
         await _saveHistory();
       default:
@@ -196,26 +206,59 @@ class GuideFlow extends ChangeNotifier {
 
   void clearNotice() => notice = null;
 
-  // ───────────── 기능 (핸들러) ─────────────
-  Future<void> _gallery(Object? arg) async {
-    if (screen == ScreenId.h) {
-      _go(ScreenId.g, FlowState.idle);
-    } else if (arg is SampleImage) {
-      picked = arg; // G·GS에서 이미지를 누름 → 선택 상태
-      _go(ScreenId.gs, FlowState.idle);
-    } else if (screen == ScreenId.gs && picked != null) {
-      // "선택한 이미지 사용": Kotlin이 열 수 있는 파일 경로를 준비한다
-      _releaseFile();
-      _imagePath = await _files.prepare(picked!);
-      _go(ScreenId.gr, FlowState.picked);
+  // ───────────── 입력 (갤러리) ─────────────
+  Future<void> _openGallery() async {
+    final access = await _gallery.requestAccess();
+    if (access != PickStatus.ok) return _fail(ErrorCode.permissionDenied);
+    galleryItems = await _gallery.recent();
+    selectedId = null;
+    _go(ScreenId.g, FlowState.idle);
+  }
+
+  void _pick(String id) {
+    selectedId = id;
+    _go(ScreenId.gs, FlowState.idle);
+  }
+
+  /// "선택한 이미지 사용": 고른 한 장을 앱 복사본으로 준비한다. 앞 이미지의 복사본은 지운다.
+  Future<void> _confirm() async {
+    final id = selectedId;
+    if (id == null) return;
+    await _releasePicked();
+    final img = await _gallery.use(id);
+    switch (img.status) {
+      case PickStatus.ok when img.ok:
+        picked = img;
+        _go(ScreenId.gr, FlowState.picked);
+      case PickStatus.cancelled:
+        break; // 그 자리 유지
+      case PickStatus.permissionDenied:
+        _fail(ErrorCode.permissionDenied);
+      default:
+        _fail(ErrorCode.imageReadFailed);
     }
   }
 
-  void _releaseFile() {
-    final p = _imagePath;
-    _imagePath = null;
-    if (p != null) _files.release(p);
+  /// 다른 이미지 고르기: 지금 이미지의 복사본을 지우고 목록으로.
+  Future<void> _retake() async {
+    await _releasePicked();
+    selectedId = null;
+    result = null;
+    error = null;
+    if (galleryItems.isEmpty) {
+      await _openGallery();
+    } else {
+      _go(ScreenId.g, FlowState.idle);
+    }
   }
+
+  Future<void> _releasePicked() async {
+    final p = picked;
+    picked = null;
+    if (p != null) await _cleanup.release(p);
+  }
+
+  // ───────────── 분석 ─────────────
 
   /// 분석 요청 한 번. 요청 번호를 **맨 먼저** 정해 두어서, 기능 맵을 읽는 중이든 분석 중이든
   /// 취소·새 요청이 생기면 그 뒤의 응답은 버린다 (계약 v1 결정 3: Flutter가 requestId를 버림).
@@ -233,7 +276,7 @@ class GuideFlow extends ChangeNotifier {
     });
     final req = AnalyzeRequest(
       requestId: id,
-      imagePath: _imagePath ?? picked!.asset,
+      imagePath: picked!.path!,
       guidance: await _guidance.fragment(),
       target: target,
     );
@@ -247,7 +290,7 @@ class GuideFlow extends ChangeNotifier {
   }
 
   Future<void> _analyzeFirst() async {
-    if (picked == null) return;
+    if (picked?.ok != true) return;
     _go(ScreenId.ga, FlowState.analyzing);
     notifyListeners();
     final r = await _analyze();
@@ -266,6 +309,7 @@ class GuideFlow extends ChangeNotifier {
     _go(ScreenId.gr, FlowState.picked); // 분석 취소 → 이전 화면 유지
   }
 
+  // ───────────── 안내 ─────────────
   Future<void> _startGuide(GuideAction a) async {
     action = a;
     step = 0;
@@ -303,21 +347,24 @@ class GuideFlow extends ChangeNotifier {
     }
   }
 
-  /// 안내 기록 저장. 원본·OCR 원문·후보 원문은 넣지 않는다.
+  // ───────────── 마무리 ─────────────
+
+  /// 안내 기록 저장. 이미지·화면에서 읽은 글자·후보 값은 넣지 않는다.
   Future<void> _saveHistory() async {
     final a = action;
     if (a == null) {
       notice = '기능을 골라 안내를 받은 뒤 저장할 수 있어요';
       return;
     }
+    final at = _now();
     await _history.save(
       HistoryEntry(
-        id: 'h${DateTime.now().microsecondsSinceEpoch}',
+        id: 'h${at.microsecondsSinceEpoch}',
         actionId: a.actionId,
         actionTitle: a.title,
         stepInstructions: [for (final s in a.steps) s.instruction],
-        input: InputKind.gallery, // TODO(3번): 세션의 입력 방식으로
-        createdAt: DateTime.now(),
+        input: picked?.input ?? InputKind.gallery,
+        createdAt: at,
         piiTypes: [
           for (final p in result?.pii ?? const <PiiCandidate>[]) p.type,
         ],
@@ -326,21 +373,22 @@ class GuideFlow extends ChangeNotifier {
     notice = '안내 기록에 저장했어요';
   }
 
-  /// HISTORY 화면이 읽는다 (3주차).
+  /// HISTORY 화면이 읽는다.
   Future<List<HistoryEntry>> historyList() => _history.list();
 
+  // ───────────── 복구·이동 ─────────────
   void _fail(ErrorCode code) {
     error = code;
     locating = false;
     _go(ScreenId.e, FlowState.error);
   }
 
-  void _back() {
+  Future<void> _back() async {
     switch (screen) {
       case ScreenId.g:
-        _reset();
+        await _reset();
       case ScreenId.gs:
-        picked = null;
+        selectedId = null;
         _go(ScreenId.g, FlowState.idle);
       case ScreenId.gr:
         _go(ScreenId.gs, FlowState.idle);
@@ -355,22 +403,24 @@ class GuideFlow extends ChangeNotifier {
           ScreenId.d5:
         if (step > 0) {
           step--;
-          _locate();
+          await _locate();
         } else {
           _pendingId = null;
           locating = false;
           _go(ScreenId.rg, FlowState.identified);
         }
       default:
-        _reset();
+        await _reset();
     }
   }
 
-  void _reset() {
+  /// 세션 끝: 대기(H)로 돌아가며 앱 복사본을 지운다.
+  Future<void> _reset() async {
     _pendingId = null;
     _slowTimer?.cancel();
-    picked = null;
-    _releaseFile(); // 앱이 만든 복사본 정리
+    await _releasePicked();
+    galleryItems = const [];
+    selectedId = null;
     result = null;
     availableActions = const [];
     action = null;

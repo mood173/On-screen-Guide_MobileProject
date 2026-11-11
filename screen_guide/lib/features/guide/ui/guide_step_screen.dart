@@ -17,6 +17,7 @@ class GuideStepScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final img = flow.picked!;
+    final r = flow.result!;
     final s = flow.currentStep!;
     final n = flow.step + 1, total = flow.totalSteps;
     VoidCallback? on(ActionId id) =>
@@ -30,9 +31,9 @@ class GuideStepScreen extends StatelessWidget {
         Stack(
           children: [
             ScreenImage(
-              asset: img.asset,
-              imageWidth: img.width,
-              imageHeight: img.height,
+              path: img.path!,
+              imageWidth: r.imageWidth,
+              imageHeight: r.imageHeight,
               target: flow.target?.box,
               dimOthers: true,
               height: 350,

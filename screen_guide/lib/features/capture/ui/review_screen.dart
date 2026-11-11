@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:screen_guide/app/guide_flow.dart';
+import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/shared/cells/guide_scaffold.dart';
 import 'package:screen_guide/shared/cells/screen_image.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
@@ -20,13 +21,11 @@ class ReviewScreen extends StatelessWidget {
       title: '선택한 이미지',
       onBack: () => flow.dispatch(ActionId.navBack),
       body: [
-        ScreenHeading('이 이미지로 안내받을까요?', '갤러리에서 선택  ·  ${img.label} 1개'),
-        ScreenImage(
-          asset: img.asset,
-          imageWidth: img.width,
-          imageHeight: img.height,
-          height: 350,
+        ScreenHeading(
+          '이 이미지로 안내받을까요?',
+          '${img.input == InputKind.camera ? '카메라로 촬영' : '갤러리에서 선택'}  ·  이미지 1개',
         ),
+        ScreenImage(path: img.path!, height: 350),
         const Text(
           '✓  원본 미전송     ✓  기기 내부 분석',
           style: TextStyle(fontSize: 12, color: AppColors.tileGalleryIcon),

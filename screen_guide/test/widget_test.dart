@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:screen_guide/app/app.dart';
-import 'package:screen_guide/app/guide_flow.dart';
 import 'package:screen_guide/features/analyze/data/fake_analyzer.dart';
+
+import 'support/test_flow.dart';
 
 void main() {
   testWidgets('홈에서 갤러리 → 샘플 선택 → 분석 → 기능 선택 → 단계 안내 → 완료까지 화면이 넘어간다', (
@@ -13,7 +14,7 @@ void main() {
     tester.view.devicePixelRatio = 2.625;
     addTearDown(tester.view.reset);
 
-    final flow = GuideFlow(
+    final flow = testFlow(
       analyzer: FakeAnalyzer(delay: const Duration(milliseconds: 300)),
     );
     await tester.pumpWidget(ScreenGuideApp(flow: flow));

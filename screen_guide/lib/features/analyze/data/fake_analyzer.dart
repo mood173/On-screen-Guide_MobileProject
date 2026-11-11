@@ -1,9 +1,9 @@
 import 'package:screen_guide/features/analyze/domain/screen_analyzer.dart';
-import 'package:screen_guide/features/capture/data/sample_images.dart';
+import 'package:screen_guide/features/analyze/data/sample_answers.dart';
 import 'package:screen_guide/shared/contracts/analysis.dart';
 import 'package:screen_guide/shared/contracts/error_code.dart';
 
-/// 가짜 분석기. 요청의 imagePath로 [SampleImage]를 찾아 그 샘플의 실제 OCR 결과를 돌려준다.
+/// 가짜 분석기. 요청 imagePath의 파일 이름으로 [SampleAnswer]를 찾아 그 샘플의 실제 OCR 결과를 돌려준다.
 /// 모르는 경로면 설정 화면 샘플로 본다.
 ///
 /// 진짜 Kotlin 분석기와 같은 규칙을 흉내 낸다 (설계 10장):
@@ -28,7 +28,7 @@ class FakeAnalyzer implements ScreenAnalyzer {
     }
 
     final sample =
-        SampleImage.byPath(request.imagePath) ?? SampleImage.settings;
+        SampleAnswer.byPath(request.imagePath) ?? SampleAnswer.settings;
     final elements = sample.elements;
 
     return AnalysisResult(

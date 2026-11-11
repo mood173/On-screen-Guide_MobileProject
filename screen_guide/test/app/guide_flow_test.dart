@@ -3,9 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:screen_guide/app/guide_flow.dart';
 import 'package:screen_guide/features/analyze/data/fake_analyzer.dart';
 import 'package:screen_guide/features/analyze/domain/screen_analyzer.dart';
+import 'package:screen_guide/features/capture/data/fake_input.dart';
 import 'package:screen_guide/features/capture/data/image_files.dart';
 import 'package:screen_guide/features/capture/data/sample_images.dart';
 import 'package:screen_guide/features/guidance_map/data/demo_guidance.dart';
+import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
 import 'package:screen_guide/features/history/data/in_memory_history_repository.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
@@ -14,14 +16,20 @@ import 'package:screen_guide/shared/contracts/error_code.dart';
 import 'package:screen_guide/shared/contracts/flow_state.dart';
 import 'package:screen_guide/shared/contracts/screen_id.dart';
 
-GuideFlow _flow([ScreenAnalyzer? a]) =>
-    GuideFlow(analyzer: a ?? FakeAnalyzer(delay: Duration.zero));
+import '../support/test_flow.dart';
+
+GuideFlow _flow([ScreenAnalyzer? a]) => testFlow(analyzer: a);
+
+/// H → G → GS → GR: 갤러리를 열고, 한 칸을 고르고, 사용한다.
+Future<void> _pickSample(GuideFlow f, SampleImage s) async {
+  await f.dispatch(ActionId.captureGallery); // H → G
+  await f.dispatch(ActionId.capturePick, s.id); // G → GS
+  await f.dispatch(ActionId.captureConfirm); // GS → GR
+}
 
 Future<GuideFlow> _toResult(SampleImage s, [ScreenAnalyzer? a]) async {
   final f = _flow(a);
-  await f.dispatch(ActionId.captureGallery); // H → G
-  await f.dispatch(ActionId.captureGallery, s); // G → GS
-  await f.dispatch(ActionId.captureGallery); // GS → GR
+  await _pickSample(f, s);
   await f.dispatch(ActionId.analyzeRun); // GR → GA → RG
   return f;
 }
@@ -83,14 +91,17 @@ void main() {
 
     await f.dispatch(ActionId.captureGallery);
     expect(f.screen, ScreenId.g);
+    expect(f.galleryItems.map((e) => e.id), ['settings', 'chat']);
 
-    await f.dispatch(ActionId.captureGallery, SampleImage.settings);
+    await f.dispatch(ActionId.capturePick, 'settings');
     expect(f.screen, ScreenId.gs);
-    expect(f.picked, SampleImage.settings);
+    expect(f.selectedId, 'settings');
 
-    await f.dispatch(ActionId.captureGallery);
+    await f.dispatch(ActionId.captureConfirm);
     expect(f.screen, ScreenId.gr);
     expect(f.state, FlowState.picked);
+    expect(f.picked!.path, 'assets/samples/sample_settings.png');
+    expect(f.picked!.input, InputKind.gallery);
 
     await f.dispatch(ActionId.analyzeRun);
     expect(f.screen, ScreenId.rg);
@@ -161,9 +172,7 @@ void main() {
   test('분석 취소: 늦게 온 응답은 버리고 GR에 머문다', () async {
     final hold = _HoldAnalyzer();
     final f = _flow(hold);
-    await f.dispatch(ActionId.captureGallery);
-    await f.dispatch(ActionId.captureGallery, SampleImage.settings);
-    await f.dispatch(ActionId.captureGallery);
+    await _pickSample(f, SampleImage.settings);
 
     final running = f.dispatch(ActionId.analyzeRun);
     expect(f.screen, ScreenId.ga);
@@ -177,13 +186,11 @@ void main() {
   });
 
   test('3초가 넘으면 slow가 켜진다 (오류로 끊지 않음)', () async {
-    final f = GuideFlow(
+    final f = testFlow(
       analyzer: FakeAnalyzer(delay: const Duration(milliseconds: 80)),
       slowAfter: const Duration(milliseconds: 20),
     );
-    await f.dispatch(ActionId.captureGallery);
-    await f.dispatch(ActionId.captureGallery, SampleImage.settings);
-    await f.dispatch(ActionId.captureGallery);
+    await _pickSample(f, SampleImage.settings);
     final running = f.dispatch(ActionId.analyzeRun);
     await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(f.slow, isTrue);
@@ -196,10 +203,8 @@ void main() {
   test('분석 요청에는 복사본 파일 경로가 들어가고, 홈으로 가면 복사본을 지운다', () async {
     final files = _RecordingFiles();
     final hold = _HoldAnalyzer();
-    final f = GuideFlow(analyzer: hold, files: files);
-    await f.dispatch(ActionId.captureGallery);
-    await f.dispatch(ActionId.captureGallery, SampleImage.chat);
-    await f.dispatch(ActionId.captureGallery);
+    final f = testFlow(analyzer: hold, files: files);
+    await _pickSample(f, SampleImage.chat);
     await f.dispatch(ActionId.analyzeRun);
 
     expect(hold.calls.single.imagePath, '/cache/sg_1/sample_chat.png');
@@ -211,13 +216,8 @@ void main() {
 
   test('완료 화면에서 안내 기록 저장 → HistoryRepository에 원문 없이 저장된다', () async {
     final history = InMemoryHistoryRepository();
-    final f = GuideFlow(
-      analyzer: FakeAnalyzer(delay: Duration.zero),
-      history: history,
-    );
-    await f.dispatch(ActionId.captureGallery);
-    await f.dispatch(ActionId.captureGallery, SampleImage.chat);
-    await f.dispatch(ActionId.captureGallery);
+    final f = testFlow(history: history);
+    await _pickSample(f, SampleImage.chat);
     await f.dispatch(ActionId.analyzeRun);
     final send = f.availableActions.single;
     await f.dispatch(ActionId.guideStart, send);
@@ -235,17 +235,14 @@ void main() {
       isNot(contains('010')),
       reason: '유형 이름만, 가린 값·원문 없음',
     );
+    expect(saved.input, InputKind.gallery);
+    expect(saved.createdAt, DateTime(2026, 11, 20, 10));
     expect(f.notice, '안내 기록에 저장했어요');
   });
 
   test('기능 목록은 GuidanceRepository에서 온다', () async {
-    final f = GuideFlow(
-      analyzer: FakeAnalyzer(delay: Duration.zero),
-      guidance: _OneActionRepo(),
-    );
-    await f.dispatch(ActionId.captureGallery);
-    await f.dispatch(ActionId.captureGallery, SampleImage.settings);
-    await f.dispatch(ActionId.captureGallery);
+    final f = testFlow(guidance: _OneActionRepo());
+    await _pickSample(f, SampleImage.settings);
     await f.dispatch(ActionId.analyzeRun);
     expect(f.availableActions.map((a) => a.actionId), ['settings.battery']);
   });
@@ -256,4 +253,44 @@ void main() {
     expect(f.screen, ScreenId.h);
     expect(f.notice, isNotNull);
   });
+
+  test(
+    '갤러리 권한 거부 → 오류 화면(PERMISSION_DENIED), 다른 이미지를 고르면 앞 복사본을 지운다',
+    () async {
+      final denied = testFlow(
+        gallery: FakeGalleryInput(
+          access: PickStatus.permissionDenied,
+          loadThumbnail: noThumbnail,
+        ),
+      );
+      await denied.dispatch(ActionId.captureGallery);
+      expect(denied.screen, ScreenId.e);
+      expect(denied.error, ErrorCode.permissionDenied);
+
+      final files = _RecordingFiles();
+      final f = testFlow(files: files);
+      await _pickSample(f, SampleImage.settings);
+      await f.dispatch(ActionId.captureRetake); // GR → G
+      expect(f.screen, ScreenId.g);
+      expect(files.released, ['/cache/sg_1/sample_settings.png']);
+      expect(f.picked, isNull);
+    },
+  );
+
+  test('준비 단계: start()가 남은 복사본 청소를 부른다', () async {
+    final cleanup = _RecordingCleanup();
+    testFlow(cleanup: cleanup).start();
+    await Future<void>.delayed(Duration.zero);
+    expect(cleanup.cleared, 1);
+  });
+}
+
+class _RecordingCleanup implements InputCleanup {
+  var cleared = 0;
+  @override
+  Future<void> clearLeftovers() async => cleared++;
+  @override
+  Future<void> openAppSettings() async {}
+  @override
+  Future<void> release(PickedImage image) async {}
 }

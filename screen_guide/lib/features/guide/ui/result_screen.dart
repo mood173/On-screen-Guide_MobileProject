@@ -28,7 +28,7 @@ class ResultScreen extends StatelessWidget {
           '버튼과 메뉴 ${r.elements.length}개를 찾았어요  ·  ${r.totalMs}ms',
         ),
         ScreenImage(
-          asset: img.asset,
+          path: img.path!,
           imageWidth: r.imageWidth,
           imageHeight: r.imageHeight,
           elements: r.elements,

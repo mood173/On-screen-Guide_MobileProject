@@ -21,23 +21,22 @@ const bool useFakeAnalyzer = bool.fromEnvironment(
   defaultValue: true,
 );
 
-/// 앱 전체의 연결 지점 묶음. (개발 계약 v1 · 결정 3: 외부 DI 패키지 없이 생성자 주입)
+/// 앱 전체의 연결 지점 묶음. (개발 계약 v1 결정 3: 외부 DI 패키지 없이 생성자 주입)
 ///
-/// 각 팀원이 진짜 구현을 만들면 **이 파일의 [bootstrap]에서 한 줄만 바꿔** 끼운다.
-/// 바꾸기 전에 그 포트의 공용 시험(test/ports/)을 통과해야 한다.
+/// 구현 객체를 만드는 곳은 **이 파일뿐**이다 (협업규격_최종 2장). 진짜 구현을 만든 사람이
+/// 그 포트의 공용 시험(test/ports/)을 통과시킨 뒤 [bootstrap]에서 **자기 줄만** 바꿔 끼운다.
 ///
-/// | 포트 | 제공 | 지금 | 진짜로 바꿀 때 |
+/// | 포트 | 구현 담당 | 지금 | 진짜로 바꿀 때 |
 /// |---|---|---|---|
-/// | ScreenAnalyzer | 팀원 1 | FakeAnalyzer | MethodChannelAnalyzer (Kotlin 채널이 계약 v1 형식이 되면) |
-/// | GuidanceRepository | 팀원 3 | DemoGuidanceRepository | 로컬 DB 구현 |
-/// | HistoryRepository | 팀원 3 | InMemoryHistoryRepository | 로컬 DB 구현 |
-/// | GalleryInput·CameraInput·InputCleanup | 팀원 3 | FakeGalleryInput 등 | image_picker·photo_manager 구현 |
-/// | Sharer | 팀원 3 | FakeSharer | share_plus 구현 |
-/// | MapUpdater | 팀원 3 | FakeMapUpdater | Firebase 구현 |
+/// | ScreenAnalyzer | 강민준 | FakeAnalyzer | MethodChannelAnalyzer (Kotlin 채널이 계약 v1 형식이 되면) |
+/// | GuidanceRepository | 최정혁 | DemoGuidanceRepository | 실제 앱 기능 맵 |
+/// | HistoryRepository | 최정혁 | InMemoryHistoryRepository | 로컬 DB 구현 |
+/// | GalleryInput·CameraInput·InputCleanup | 최정혁 | Fake* (샘플 이미지) | 실제 갤러리·image_picker 구현 |
+/// | Sharer | 최정혁 | FakeSharer | share_plus 구현 |
+/// | MapUpdater | 최정혁 | FakeMapUpdater | Firebase 구현 (선택) |
 class AppDependencies {
   const AppDependencies({
     required this.analyzer,
-    required this.imageFiles,
     required this.guidance,
     required this.history,
     required this.galleryInput,
@@ -48,7 +47,6 @@ class AppDependencies {
   });
 
   final ScreenAnalyzer analyzer;
-  final ImageFiles imageFiles;
   final GuidanceRepository guidance;
   final HistoryRepository history;
   final GalleryInput galleryInput;
@@ -59,7 +57,6 @@ class AppDependencies {
 
   GuideFlow createFlow() => GuideFlow(
     analyzer: analyzer,
-    files: imageFiles,
     guidance: guidance,
     history: history,
     galleryInput: galleryInput,
@@ -72,16 +69,15 @@ class AppDependencies {
 
 AppDependencies bootstrap({bool? fake}) {
   final useFake = fake ?? useFakeAnalyzer;
-  final files = CacheImageFiles();
+  final files = CacheImageFiles(); // 가짜 입력이 샘플을 앱 임시 폴더에 복사할 때 쓴다
   return AppDependencies(
-    analyzer: useFake ? FakeAnalyzer() : MethodChannelAnalyzer(), // 팀원 1
-    imageFiles: files,
-    guidance: const DemoGuidanceRepository(), // 팀원 3: 로컬 DB 구현으로 교체
-    history: InMemoryHistoryRepository(), // 팀원 3: 로컬 DB 구현으로 교체
-    galleryInput: FakeGalleryInput(files: files), // 팀원 3: 실제 갤러리 구현으로 교체
-    cameraInput: FakeCameraInput(files: files), // 팀원 3: image_picker 구현으로 교체
-    inputCleanup: FakeInputCleanup(files: files), // 팀원 3: 실제 구현으로 교체
-    sharer: FakeSharer(), // 팀원 3: share_plus 구현으로 교체
-    mapUpdater: FakeMapUpdater(), // 팀원 3: Firebase 구현으로 교체
+    analyzer: useFake ? FakeAnalyzer() : MethodChannelAnalyzer(), // 강민준
+    guidance: const DemoGuidanceRepository(), // 최정혁: 실제 앱 기능 맵으로 교체
+    history: InMemoryHistoryRepository(), // 최정혁: 로컬 DB 구현으로 교체
+    galleryInput: FakeGalleryInput(files: files), // 최정혁: 실제 갤러리 구현으로 교체
+    cameraInput: FakeCameraInput(files: files), // 최정혁: image_picker 구현으로 교체
+    inputCleanup: FakeInputCleanup(files: files), // 최정혁: 실제 구현으로 교체
+    sharer: FakeSharer(), // 최정혁: share_plus 구현으로 교체
+    mapUpdater: FakeMapUpdater(), // 최정혁: Firebase 구현으로 교체 (선택)
   );
 }
