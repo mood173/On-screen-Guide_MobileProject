@@ -8,7 +8,7 @@ import org.junit.Test
 // 보고서 부록 A 단위 시험(23건)을 JUnit으로 옮긴 것. 앱과 같은 GuideLogic.kt를 시험한다.
 class GuideLogicTest {
     private fun kinds(text: String) = merge(regexCandidates(text), text)
-        .joinToString("; ") { text.substring(it.start, it.end) + "=" + it.types.joinToString("+") }.ifEmpty { "없음" }
+        .joinToString("; ") { text.substring(it.start, it.end) + "=" + it.type }.ifEmpty { "없음" }
     private val r = Box(0, 0, 10, 10)
     private fun els(vararg l: String) = l.map { UiElement(it, r) }
 
@@ -27,7 +27,7 @@ class GuideLogicTest {
 
     @Test fun m01_중복후보_병합() {
         val t = "연락처 010-1234-5678"; val m = merge(regexCandidates(t), t)
-        assertEquals(1, m.size); assertEquals(listOf("휴대전화"), m[0].types)
+        assertEquals(1, m.size); assertEquals("휴대전화", m[0].type)
     }
     @Test fun n01_정규화() = assertEquals("알림설정", norm("알림 설정"))
     @Test fun t01_정확일치() = assertEquals("설정", findTarget(els("설정", "알림"), "설정")?.element?.label)
@@ -57,19 +57,19 @@ class GuideLogicTest {
         assertEquals("demo.chat", identifyScreen(els("홍길동 대화", "보내기"), demoMaps)?.screenId)
     @Test fun e02_ML_Kit가_날짜를_전화로_잡아도_제외() {
         val t = "2026-10-23"
-        val c = merge(regexCandidates(t) + Candidate(0, 10, listOf("전화(ML Kit)")), t)
+        val c = merge(regexCandidates(t) + Candidate(0, 10, "전화"), t)
         assertEquals(0, c.size)
     }
     @Test fun e03_주민번호_뒷자리_전화오탐은_주민번호로_합침() {
         val t = "본인 확인용으로 900101-1234567 남겨"
         val s = t.indexOf("900101"); val back = t.indexOf("1234567")
-        val c = merge(regexCandidates(t) + Candidate(back, back + 7, listOf("전화(ML Kit)")), t)
-        assertEquals(1, c.size); assertEquals(listOf("주민·외국인등록번호"), c[0].types); assertEquals(s, c[0].start)
+        val c = merge(regexCandidates(t) + Candidate(back, back + 7, "전화"), t)
+        assertEquals(1, c.size); assertEquals("주민·외국인등록번호", c[0].type); assertEquals(s, c[0].start)
     }
     @Test fun e04_계좌를_ML_Kit가_전화로_잡으면_계좌_유지() {
         val t = "110-123-456789"
-        val c = merge(regexCandidates(t) + Candidate(0, t.length, listOf("전화(ML Kit)")), t)
-        assertEquals(listOf("계좌번호 추정"), c[0].types)
+        val c = merge(regexCandidates(t) + Candidate(0, t.length, "전화"), t)
+        assertEquals("계좌번호 추정", c[0].type)
     }
     @Test fun e05_이메일_가림() = assertEquals("gil****@*******.*om", mask("gildong@example.com"))
 }
