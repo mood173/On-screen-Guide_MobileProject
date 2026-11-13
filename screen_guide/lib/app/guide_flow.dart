@@ -158,7 +158,8 @@ class GuideFlow extends ChangeNotifier {
     return StageTable.rules[stage]!.progress;
   }
 
-  /// 마지막으로 실패한 단계. [_fail]이 정하고 [_reset]이 지운다.
+  /// 마지막으로 실패한 단계. 복구 단계에 들어올 때(_onEnter) 정하고 [_reset]이 지운다.
+  /// 오류 화면끼리(E ↔ DENY)는 같은 복구 단계라 _onEnter가 돌지 않으므로 처음 실패한 단계가 남는다.
   Stage? _failedStage;
 
   // ───────────── dispatch ─────────────
@@ -299,11 +300,9 @@ class GuideFlow extends ChangeNotifier {
     _go(ScreenId.rg, FlowState.identified);
   }
 
+  /// 분석 취소 → 확인 장면(GR)으로. 요청 번호 버리기·타이머 정지는 _onExit(analyze)가 한다.
   void _cancel() {
-    _pendingId = null;
-    _slowTimer?.cancel();
-    slow = false;
-    _go(ScreenId.gr, FlowState.picked); // 분석 취소 → 이전 화면 유지
+    _go(ScreenId.gr, FlowState.picked);
   }
 
   // ───────────── 안내 ─────────────
@@ -377,9 +376,7 @@ class GuideFlow extends ChangeNotifier {
   void _fail(ErrorCode code) {
     error = code;
     locating = false;
-    // 어디서 실패했는지 기억한다 (3-9). 오류 화면에서 또 실패하면 처음 실패한 단계를 그대로 둔다.
-    if (screen.stage != Stage.recover) _failedStage = screen.stage;
-    _go(ScreenId.e, FlowState.error);
+    _go(ScreenId.e, FlowState.error); // 실패한 단계 기억은 _onEnter(recover)가 한다
   }
 
   Future<void> _back() async {
@@ -434,9 +431,65 @@ class GuideFlow extends ChangeNotifier {
     _go(ScreenId.h, FlowState.idle);
   }
 
+  /// 화면을 바꾼다. 단계까지 바뀌면 나가는 단계를 정리하고 들어가는 단계를 준비한다 (6-2, 6-4 6번).
+  /// 같은 단계 안의 이동(G → GS, D1 → D2)에서는 아무것도 하지 않는다.
   void _go(ScreenId s, FlowState st) {
+    final from = screen.stage;
+    final to = s.stage;
     screen = s;
     state = st;
+    if (from != to) {
+      _onExit(from);
+      _onEnter(to, from: from);
+    }
+  }
+
+  // ───────────── 단계에 들어갈 때·나갈 때 (시스템설계_최종 3-1 "들어갈 때 준비 / 나갈 때 정리") ─────────────
+  //
+  // 여기에는 바로 끝나는 일(값 바꾸기, 타이머 멈추기)만 둔다.
+  // 파일 삭제처럼 기다려야 하는 일은 _go가 기다릴 수 없어서 _reset·_retake·_confirm에 둔다 (협업규격 3.4 호출 시점).
+  // switch에 default가 없어 단계가 새로 생기면 컴파일 오류로 빠진 갈래를 알려 준다.
+
+  void _onExit(Stage stage) {
+    switch (stage) {
+      case Stage.analyze:
+        // 3-4 나갈 때: 타이머 정지. 요청 번호도 버려서 늦게 온 응답은 무시된다 (계약 v1 결정 3).
+        _pendingId = null;
+        _slowTimer?.cancel();
+        slow = false;
+      case Stage.ready:
+      case Stage.waiting:
+      case Stage.input:
+      case Stage.choose:
+      case Stage.guide:
+      case Stage.finish:
+      case Stage.share:
+      case Stage.recover:
+      case Stage.records:
+      case Stage.overlay:
+        break; // 아직 할 일 없음
+    }
+  }
+
+  void _onEnter(Stage stage, {required Stage from}) {
+    switch (stage) {
+      case Stage.recover:
+        // 3-9: 어디서 왔는지 기억한다 → 진행 칸을 그 단계에 멈춘다.
+        _failedStage = from;
+      case Stage.share:
+        // 기능별_검토_결론 5장: 공유 단계에 들어올 때마다 "확인함"을 지운다 → P를 다시 거쳐야 보낼 수 있다.
+        _shareConfirmed = false;
+      case Stage.ready:
+      case Stage.waiting: // 세션 비우기·복사본 삭제는 _reset이 한다 (기다려야 하는 일)
+      case Stage.input:
+      case Stage.analyze:
+      case Stage.choose:
+      case Stage.guide:
+      case Stage.finish:
+      case Stage.records:
+      case Stage.overlay:
+        break; // 아직 할 일 없음
+    }
   }
 
   static ScreenId _stepScreen(int i) => const [
