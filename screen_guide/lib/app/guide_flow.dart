@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:screen_guide/app/stage.dart';
 import 'package:screen_guide/app/stage_table.dart';
 import 'package:screen_guide/features/analyze/domain/screen_analyzer.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
@@ -146,6 +147,19 @@ class GuideFlow extends ChangeNotifier {
   };
 
   bool allows(ActionId id) => allowed.contains(id);
+
+  // ───────────── 화면 틀: 진행 표시 (시스템설계_최종 4-1) ─────────────
+
+  /// 진행 표시 5칸 중 지금 칸 (1 입력 ~ 5 완료). 진행 표시가 없는 화면이면 null.
+  /// 복구 화면은 실패한 단계의 칸에 멈춘다 (3-9).
+  int? get progress {
+    final stage = screen.stage == Stage.recover ? _failedStage : screen.stage;
+    if (stage == null) return null;
+    return StageTable.rules[stage]!.progress;
+  }
+
+  /// 마지막으로 실패한 단계. [_fail]이 정하고 [_reset]이 지운다.
+  Stage? _failedStage;
 
   // ───────────── dispatch ─────────────
   Future<void> dispatch(ActionId id, [Object? arg]) async {
@@ -363,6 +377,8 @@ class GuideFlow extends ChangeNotifier {
   void _fail(ErrorCode code) {
     error = code;
     locating = false;
+    // 어디서 실패했는지 기억한다 (3-9). 오류 화면에서 또 실패하면 처음 실패한 단계를 그대로 둔다.
+    if (screen.stage != Stage.recover) _failedStage = screen.stage;
     _go(ScreenId.e, FlowState.error);
   }
 
@@ -414,6 +430,7 @@ class GuideFlow extends ChangeNotifier {
     error = null;
     slow = false;
     _shareConfirmed = false;
+    _failedStage = null;
     _go(ScreenId.h, FlowState.idle);
   }
 

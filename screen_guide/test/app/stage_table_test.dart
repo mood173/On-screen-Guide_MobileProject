@@ -45,13 +45,52 @@ void main() {
     }
   });
 
-  test('홈(navHome)은 마무리(DONE)와 오류(E)에서만 열린다 (시스템설계 3-7·3-9)', () {
+  test('홈(navHome)은 앱 셸 탭(H·HISTORY·SETTINGS)과 마무리(DONE)·오류(E)에서만 열린다 (3-7·3-9·4-1)', () {
     final flow = testFlow();
-    final opened = [
+    final opened = {
       for (final s in ScreenId.values)
         if ((flow..screen = s).allows(ActionId.navHome)) s,
-    ];
-    expect(opened, [ScreenId.done, ScreenId.e]);
+    };
+    expect(opened, {
+      ScreenId.h,
+      ScreenId.history,
+      ScreenId.settings,
+      ScreenId.done,
+      ScreenId.e,
+    });
+  });
+
+  // 단위 4: 화면 틀
+  test('셸과 진행 칸이 시스템설계 4-1·3장 표와 같다', () {
+    const expected = <Stage, (Shell, int?)>{
+      Stage.ready: (Shell.start, null),
+      Stage.waiting: (Shell.app, null),
+      Stage.input: (Shell.guide, 1),
+      Stage.analyze: (Shell.guide, 2),
+      Stage.choose: (Shell.guide, 3),
+      Stage.guide: (Shell.guide, 4),
+      Stage.finish: (Shell.guide, 5),
+      Stage.share: (Shell.share, null),
+      Stage.recover: (Shell.guide, null), // 실패한 단계 칸 — 흐름 시험에서 확인
+      Stage.records: (Shell.app, null),
+      Stage.overlay: (Shell.overlay, null),
+    };
+    for (final MapEntry(key: stage, value: (shell, progress))
+        in expected.entries) {
+      final rule = StageTable.rules[stage]!;
+      expect(rule.shell, shell, reason: '$stage 셸');
+      expect(rule.progress, progress, reason: '$stage 진행 칸');
+    }
+  });
+
+  test('앱 셸 화면에서는 하단 탭 3개가 열리고, 다른 셸에서는 안 열린다', () {
+    for (final s in ScreenId.values) {
+      final isApp = StageTable.ruleOf(s).shell == Shell.app;
+      final opened = StageTable.allowedOn(s).containsAll(
+        StageTable.appShellTabs,
+      );
+      expect(opened, isApp, reason: s.code);
+    }
   });
 
   // "확인 후에는 열린다"는 확인 버튼(shareConfirm)을 만들 때(공유 화면, 협업규격 4.2 5번) 그 버튼으로 시험한다.

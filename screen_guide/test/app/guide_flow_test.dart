@@ -311,6 +311,25 @@ void main() {
     expect(f.allows(ActionId.captureRetake), isTrue);
   });
 
+  test('진행 칸: 입력 1 → 선택 3, 분석에서 실패하면 오류 화면은 2에 멈춘다 (4-1, 3-9)', () async {
+    final f = _flow();
+    expect(f.progress, isNull, reason: '홈은 진행 표시 없음');
+    await _pickSample(f, SampleImage.settings);
+    expect(f.progress, 1);
+    await f.dispatch(ActionId.analyzeRun);
+    expect(f.progress, 3);
+
+    final failed = await _toResult(
+      SampleImage.settings,
+      FakeAnalyzer(delay: Duration.zero, failWith: ErrorCode.analysisFailed),
+    );
+    expect(failed.screen, ScreenId.e);
+    expect(failed.progress, 2, reason: '분석에서 실패');
+
+    await failed.dispatch(ActionId.navHome);
+    expect(failed.progress, isNull, reason: '홈으로 가면 실패 단계도 지운다');
+  });
+
   test('복구: 갤러리 세션의 오류 화면은 다시 고르기로 목록에 돌아간다', () async {
     final f = await _toResult(
       SampleImage.settings,
