@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "screen_guide/feature_map/schema_v1.json",
+  "title": "화면길잡이 기능 맵 v1",
+  "description": "앱이 들고 있는 기능 맵 파일의 형식. 협업규격_최종 3.2 '기능 맵 규칙'의 형식 부분을 적는다. 앵커끼리 포함 금지, 화면 ID·기능 ID의 전체 유일성, 단계 화면이 맵에 있는지는 JSON Schema로 표현할 수 없어 앱의 읽기 코드(feature_map.dart)와 맵 공용 시험이 확인한다.",
+  "type": "object",
+  "required": ["schemaVersion", "revision", "apps"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "revision": {
+      "type": "string",
+      "minLength": 1,
+      "description": "맵 배포 버전. 예: 2026-11-20.1"
+    },
+    "apps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/app" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$"
+    },
+    "app": {
+      "type": "object",
+      "required": ["packageName", "screens", "actions"],
+      "additionalProperties": false,
+      "properties": {
+        "packageName": { "type": "string" },
+        "locale": { "type": "string" },
+        "versionMin": { "type": ["string", "null"] },
+        "versionMax": { "type": ["string", "null"] },
+        "screens": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/screen" }
+        },
+        "actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
+        }
+      }
+    },
+    "screen": {
+      "type": "object",
+      "required": ["screenId", "anchors"],
+      "additionalProperties": false,
+      "properties": {
+        "screenId": {
+          "$ref": "#/$defs/id",
+          "description": "앱.화면 (예: baemin.home). 맵 전체에서 겹치지 않는다"
+        },
+        "anchors": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "화면 식별 글자. 2개 이상, 서로 포함하지 않는다"
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["actionId", "title", "description", "steps"],
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "$ref": "#/$defs/id",
+          "description": "영역.동작 (예: settings.notification). 맵 전체에서 겹치지 않는다"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "supportLevel": { "enum": ["verified", "draft"] },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/step" },
+          "description": "첫 단계의 screenId가 이 기능의 시작 화면이다"
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "required": ["screenId", "selector", "instruction", "result"],
+      "additionalProperties": false,
+      "properties": {
+        "screenId": { "$ref": "#/$defs/id", "description": "이 단계를 하는 화면. 맵에 있는 화면이어야 한다" },
+        "selector": {
+          "type": "string",
+          "pattern": "\\S.*\\S",
+          "description": "누를 UI의 글자. 2자 이상, 실제 OCR에서 한 줄로 읽히는 글자"
+        },
+        "instruction": { "type": "string", "minLength": 1 },
+        "result": { "type": "string" }
+      }
+    }
+  }
+}

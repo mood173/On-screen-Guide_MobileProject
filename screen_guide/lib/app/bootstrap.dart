@@ -7,7 +7,7 @@ import 'package:screen_guide/features/capture/data/file_input_cleanup.dart';
 import 'package:screen_guide/features/capture/data/image_files.dart';
 import 'package:screen_guide/features/capture/data/picker_camera_input.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
-import 'package:screen_guide/features/guidance_map/data/demo_guidance.dart';
+import 'package:screen_guide/features/guidance_map/data/asset_guidance_repository.dart';
 import 'package:screen_guide/features/guidance_map/data/fake_map_updater.dart';
 import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
 import 'package:screen_guide/features/guidance_map/domain/map_updater.dart';
@@ -31,7 +31,7 @@ const bool useFakeAnalyzer = bool.fromEnvironment(
 /// | 포트 | 구현 담당 | 지금 | 진짜로 바꿀 때 |
 /// |---|---|---|---|
 /// | ScreenAnalyzer | 강민준 | FakeAnalyzer | MethodChannelAnalyzer (Kotlin 채널이 계약 v1 형식이 되면) |
-/// | GuidanceRepository | 최정혁 | DemoGuidanceRepository | 실제 앱 기능 맵 |
+/// | GuidanceRepository | 최정혁 | **AssetGuidanceRepository** (앱에 든 JSON 맵, 지금은 체험용과 같은 내용) | 실제 앱 맵 내용으로 JSON 교체 (11/27) |
 /// | HistoryRepository | 최정혁 | InMemoryHistoryRepository | 로컬 DB 구현 |
 /// | CameraInput | 최정혁 | **PickerCameraInput** (image_picker) | — (교체함, 11/12) |
 /// | InputCleanup | 최정혁 | **FileInputCleanup** (앱 복사본·image_picker 잔여 정리, app_settings) | — (교체함, 11/13) |
@@ -76,7 +76,7 @@ AppDependencies bootstrap({bool? fake}) {
   final files = CacheImageFiles(); // 가짜 입력이 샘플을 앱 임시 폴더에 복사할 때 쓴다
   return AppDependencies(
     analyzer: useFake ? FakeAnalyzer() : MethodChannelAnalyzer(), // 강민준
-    guidance: const DemoGuidanceRepository(), // 최정혁: 실제 앱 기능 맵으로 교체
+    guidance: AssetGuidanceRepository(), // 최정혁: assets/feature_maps/ JSON 맵
     history: InMemoryHistoryRepository(), // 최정혁: 로컬 DB 구현으로 교체
     galleryInput: FakeGalleryInput(files: files), // 최정혁: 실제 갤러리 구현으로 교체
     cameraInput: PickerCameraInput(), // 최정혁: image_picker (기기 기본 카메라)
