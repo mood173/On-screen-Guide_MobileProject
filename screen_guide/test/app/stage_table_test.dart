@@ -54,10 +54,11 @@ void main() {
     expect(opened, [ScreenId.done, ScreenId.e]);
   });
 
+  // "확인 후에는 열린다"는 확인 버튼(shareConfirm)을 만들 때(공유 화면, 협업규격 4.2 5번) 그 버튼으로 시험한다.
+  // 값은 흐름만 바꿀 수 있어 여기서 직접 켤 수 없다.
   test('공유 관문: P에서 확인하기 전에는 SHARE에서도 shareSend가 잠긴다 (검토 결론 5장)', () {
     final flow = testFlow()..screen = ScreenId.share;
+    expect(flow.shareConfirmed, isFalse);
     expect(flow.allows(ActionId.shareSend), isFalse);
-    flow.shareConfirmed = true;
-    expect(flow.allows(ActionId.shareSend), isTrue);
   });
 }

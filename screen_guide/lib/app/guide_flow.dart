@@ -6,7 +6,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:screen_guide/app/stage_table.dart';
-
 import 'package:screen_guide/features/analyze/domain/screen_analyzer.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
@@ -100,8 +99,10 @@ class GuideFlow extends ChangeNotifier {
   bool slow = false;
 
   /// 공유 전 확인(P)에서 "확인했어요"를 눌렀는가. 꺼져 있으면 `shareSend`를 잠근다.
+  /// 화면이 바꿀 수 없게 비공개로 두고 읽기만 열어 둔다 (협업규격 3.6: 세션 값은 흐름이 가진다).
   /// 켜는 곳(shareConfirm)과 공유 단계에 들어올 때 끄는 곳은 공유 화면을 만들 때(협업규격 4.2 5번) 넣는다.
-  bool shareConfirmed = false;
+  bool get shareConfirmed => _shareConfirmed;
+  bool _shareConfirmed = false;
 
   /// 아직 없는 기능을 눌렀을 때 한 번 보여 줄 문구. 화면이 보여 준 뒤 [clearNotice]를 부른다.
   String? notice;
@@ -132,7 +133,7 @@ class GuideFlow extends ChangeNotifier {
     if (locating) {
       s.removeAll(_stepActions); // 대상을 찾는 중에는 단계 버튼 잠금 (3-6, 중복 실행 차단)
     }
-    if (!shareConfirmed) {
+    if (!_shareConfirmed) {
       s.remove(ActionId.shareSend); // P에서 확인하기 전에는 보낼 수 없다 (기능별_검토_결론 5장 관문, 필수)
     }
     return s;
@@ -412,7 +413,7 @@ class GuideFlow extends ChangeNotifier {
     locating = false;
     error = null;
     slow = false;
-    shareConfirmed = false;
+    _shareConfirmed = false;
     _go(ScreenId.h, FlowState.idle);
   }
 
