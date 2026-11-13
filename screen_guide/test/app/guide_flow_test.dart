@@ -210,6 +210,14 @@ void main() {
     expect(hold.calls.single.imagePath, '/cache/sg_1/sample_chat.png');
     expect(f.result!.screenId, 'demo.chat', reason: '가짜 분석기는 파일 이름으로 샘플을 찾는다');
 
+    // 홈 버튼은 마무리·오류 화면에만 있다 (시스템설계_최종 3-7·3-9). 안내를 끝까지 진행한 뒤 홈으로.
+    expect(f.allows(ActionId.navHome), isFalse, reason: '선택 단계에서는 홈 없음');
+    await f.dispatch(ActionId.guideStart, f.availableActions.first);
+    for (var i = 0; i < 5 && f.screen != ScreenId.done; i++) {
+      await f.dispatch(ActionId.guideNext);
+    }
+    expect(f.screen, ScreenId.done);
+
     await f.dispatch(ActionId.navHome);
     expect(files.released, ['/cache/sg_1/sample_chat.png']);
   });

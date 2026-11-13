@@ -5,6 +5,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:screen_guide/app/stage_table.dart';
+
 import 'package:screen_guide/features/analyze/domain/screen_analyzer.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
@@ -97,6 +99,10 @@ class GuideFlow extends ChangeNotifier {
   /// 분석이 [slowAfter]를 넘김 → "조금 더 걸리고 있어요"
   bool slow = false;
 
+  /// 공유 전 확인(P)에서 "확인했어요"를 눌렀는가. 꺼져 있으면 `shareSend`를 잠근다.
+  /// 켜는 곳(shareConfirm)과 공유 단계에 들어올 때 끄는 곳은 공유 화면을 만들 때(협업규격 4.2 5번) 넣는다.
+  bool shareConfirmed = false;
+
   /// 아직 없는 기능을 눌렀을 때 한 번 보여 줄 문구. 화면이 보여 준 뒤 [clearNotice]를 부른다.
   String? notice;
 
@@ -117,53 +123,26 @@ class GuideFlow extends ChangeNotifier {
     unawaited(_mapUpdater.checkForUpdate());
   }
 
-  // ───────────── Gate: 화면별로 허용하는 행동 ─────────────
-  static const _always = {ActionId.navBack, ActionId.navHome};
-  static const _gate = <ScreenId, Set<ActionId>>{
-    // 대기 (시스템설계_최종 3-2)
-    ScreenId.h: {
-      ActionId.captureGallery,
-      ActionId.captureCamera,
-      ActionId.overlaySetup,
-      ActionId.navHistory,
-      ActionId.navSettings,
-    },
-    ScreenId.g: {ActionId.capturePick},
-    ScreenId.gs: {
-      ActionId.capturePick,
-      ActionId.captureConfirm,
-      ActionId.captureRetake,
-    },
-    ScreenId.gr: {ActionId.analyzeRun, ActionId.captureRetake},
-    ScreenId.ga: {ActionId.analyzeCancel},
-    // 선택: 저장·공유는 열지 않는다 (기능별_검토_결론 13장 X1)
-    ScreenId.rg: {ActionId.guideStart, ActionId.captureRetake},
-    ScreenId.d1: _stepActions,
-    ScreenId.d2: _stepActions,
-    ScreenId.d3: _stepActions,
-    ScreenId.d4: _stepActions,
-    ScreenId.d5: _stepActions,
-    ScreenId.done: {ActionId.historySave, ActionId.sharePrepare},
-    // 복구 (시스템설계_최종 3-9). 화면은 세션의 입력 방식에 맞는 버튼만 보여 준다
-    ScreenId.e: {
-      ActionId.captureRetake,
-      ActionId.captureCamera,
-      ActionId.captureGallery,
-    },
-  };
+  // ───────────── 관문: 단계 설정표를 본다 (시스템설계_최종 3-1, 6-2 ①) ─────────────
+
+  /// 표(고정)가 정한 버튼에서, 흐름의 상태에 따라 더 잠근다.
+  /// 표 = "이 장면에서 원래 누를 수 있는 것", 여기 = "지금 이 순간 막아야 하는 것".
+  Set<ActionId> get allowed {
+    final s = {...StageTable.always, ...StageTable.allowedOn(screen)};
+    if (locating) {
+      s.removeAll(_stepActions); // 대상을 찾는 중에는 단계 버튼 잠금 (3-6, 중복 실행 차단)
+    }
+    if (!shareConfirmed) {
+      s.remove(ActionId.shareSend); // P에서 확인하기 전에는 보낼 수 없다 (기능별_검토_결론 5장 관문, 필수)
+    }
+    return s;
+  }
+
   static const _stepActions = {
     ActionId.guideNext,
     ActionId.guidePrev,
     ActionId.guideMismatch,
   };
-
-  Set<ActionId> get allowed {
-    var s = {..._always, ...?_gate[screen]};
-    if (locating) {
-      s = s.difference(_stepActions); // 다시 찾는 중에는 단계 버튼 잠금 (중복 실행 차단)
-    }
-    return s;
-  }
 
   bool allows(ActionId id) => allowed.contains(id);
 
@@ -433,6 +412,7 @@ class GuideFlow extends ChangeNotifier {
     locating = false;
     error = null;
     slow = false;
+    shareConfirmed = false;
     _go(ScreenId.h, FlowState.idle);
   }
 

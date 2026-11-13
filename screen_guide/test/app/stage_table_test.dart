@@ -34,32 +34,30 @@ void main() {
     expect(opened, [ScreenId.share]);
   });
 
-  // 단위 3에서 GuideFlow가 이 표를 보게 바꿔도 동작이 같은지 미리 확인한다.
-  // 지금 GuideFlow._gate에 적힌 화면들만 비교한다 (나머지 화면은 아직 만들어지지 않음).
-  test('지금 GuideFlow 관문과 같은 결과를 낸다', () {
-    const gated = [
-      ScreenId.h,
-      ScreenId.g,
-      ScreenId.gs,
-      ScreenId.gr,
-      ScreenId.ga,
-      ScreenId.rg,
-      ScreenId.d1,
-      ScreenId.d2,
-      ScreenId.d3,
-      ScreenId.d4,
-      ScreenId.d5,
-      ScreenId.done,
-      ScreenId.e,
-    ];
+  // 단위 3: GuideFlow의 관문이 표를 그대로 쓰는지 (상태 잠금이 없을 때).
+  test('GuideFlow 관문 = 표 결과 (모든 화면, shareSend 제외)', () {
     final flow = testFlow();
-    for (final s in gated) {
+    for (final s in ScreenId.values) {
       flow.screen = s;
-      expect(
-        {...StageTable.always, ...StageTable.allowedOn(s)},
-        flow.allowed,
-        reason: s.code,
-      );
+      final fromTable = {...StageTable.always, ...StageTable.allowedOn(s)}
+        ..remove(ActionId.shareSend); // 확인 전이라 잠김 (아래 시험)
+      expect(flow.allowed, fromTable, reason: s.code);
     }
+  });
+
+  test('홈(navHome)은 마무리(DONE)와 오류(E)에서만 열린다 (시스템설계 3-7·3-9)', () {
+    final flow = testFlow();
+    final opened = [
+      for (final s in ScreenId.values)
+        if ((flow..screen = s).allows(ActionId.navHome)) s,
+    ];
+    expect(opened, [ScreenId.done, ScreenId.e]);
+  });
+
+  test('공유 관문: P에서 확인하기 전에는 SHARE에서도 shareSend가 잠긴다 (검토 결론 5장)', () {
+    final flow = testFlow()..screen = ScreenId.share;
+    expect(flow.allows(ActionId.shareSend), isFalse);
+    flow.shareConfirmed = true;
+    expect(flow.allows(ActionId.shareSend), isTrue);
   });
 }

@@ -24,8 +24,11 @@ class StageRule {
 class StageTable {
   StageTable._(); // 표만 담는 곳이라 객체를 만들지 않는다.
 
-  /// 어느 단계에서든 허용: 뒤로·홈. (지금 GuideFlow의 `_always`와 같다)
-  static const always = {ActionId.navBack, ActionId.navHome};
+  /// 어느 단계에서든 허용: 뒤로. 뒤로가 어디로 가는지는 단계의 화면 틀이 정한다 (3-1).
+  /// 홈(`navHome`)은 넣지 않는다: 문서 3장이 마무리(3-7)와 오류 E(3-9)에만 적었고,
+  /// 분석 중(3-4)은 "analyzeCancel 하나"다 (11/14 결정, 골격의 "어디서나 홈"에서 바꿈).
+  /// 앱 셸의 하단 탭(홈·기록·설정)은 화면 틀 정보를 만들 때(단위 4) 셸 쪽에서 연다.
+  static const always = {ActionId.navBack};
 
   static const rules = <Stage, StageRule>{
     // 3-2 준비: 앱 시작 중이라 누를 버튼이 없다.
@@ -86,7 +89,9 @@ class StageTable {
       allowed: {ActionId.historySave, ActionId.sharePrepare, ActionId.navHome},
     ),
 
-    // 3-8 공유. shareSend는 SHARE 장면에만 → P(확인)를 거치지 않고는 보낼 수 없다.
+    // 3-8 공유. shareSend는 SHARE 장면에만 연다.
+    // 표만으로는 "P를 거쳤는가"를 알 수 없다 (SHARE로 바로 가는 길이 생기면 뚫림).
+    // 기능별_검토_결론 5장 관문(필수): 세션의 "확인함" 값이 켜져 있을 때만 shareSend — 흐름 상태라 GuideFlow에서 확인한다.
     Stage.share: StageRule(
       allowed: {ActionId.shareConfirm, ActionId.shareSend, ActionId.navBack},
       byScene: {
