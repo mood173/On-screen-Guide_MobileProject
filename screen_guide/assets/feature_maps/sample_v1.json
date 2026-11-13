@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "revision": "2026-11-13.1",
+  "apps": [
+    {
+      "packageName": "demo.screen_guide",
+      "locale": "ko-KR",
+      "versionMin": null,
+      "versionMax": null,
+      "screens": [
+        {
+          "screenId": "demo.settings",
+          "anchors": ["네트워크 및 인터넷", "알림 설정", "배터리", "디스플레이"]
+        },
+        {
+          "screenId": "demo.chat",
+          "anchors": ["대화", "메시지 입력", "보내기"]
+        }
+      ],
+      "actions": [
+        {
+          "actionId": "settings.notification",
+          "title": "알림 설정 바꾸기",
+          "description": "앱별 알림을 켜고 끄는 화면으로 가요",
+          "supportLevel": "draft",
+          "steps": [
+            {
+              "screenId": "demo.settings",
+              "selector": "알림 설정",
+              "instruction": "알림 설정을 눌러주세요",
+              "result": "앱별 알림을 켜고 끌 수 있는 화면이 열려요."
+            }
+          ]
+        },
+        {
+          "actionId": "settings.display",
+          "title": "글자 크기 바꾸기",
+          "description": "디스플레이에서 글꼴 크기를 바꿔요",
+          "supportLevel": "draft",
+          "steps": [
+            {
+              "screenId": "demo.settings",
+              "selector": "디스플레이",
+              "instruction": "디스플레이를 눌러주세요",
+              "result": "어두운 테마와 글꼴 크기를 바꾸는 화면이 열려요."
+            }
+          ]
+        },
+        {
+          "actionId": "chat.send",
+          "title": "메시지 보내기",
+          "description": "대화방에서 메시지를 적어 보내요",
+          "supportLevel": "draft",
+          "steps": [
+            {
+              "screenId": "demo.chat",
+              "selector": "메시지 입력",
+              "instruction": "메시지 입력 칸을 눌러주세요",
+              "result": "키보드가 열리면 보낼 내용을 적어요."
+            },
+            {
+              "screenId": "demo.chat",
+              "selector": "보내기",
+              "instruction": "보내기를 눌러주세요",
+              "result": "적은 메시지가 상대에게 전달돼요."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
