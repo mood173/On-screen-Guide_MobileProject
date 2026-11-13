@@ -3,6 +3,7 @@ import 'package:screen_guide/features/analyze/data/fake_analyzer.dart';
 import 'package:screen_guide/features/analyze/data/method_channel_analyzer.dart';
 import 'package:screen_guide/features/analyze/domain/screen_analyzer.dart';
 import 'package:screen_guide/features/capture/data/fake_input.dart';
+import 'package:screen_guide/features/capture/data/file_input_cleanup.dart';
 import 'package:screen_guide/features/capture/data/image_files.dart';
 import 'package:screen_guide/features/capture/data/picker_camera_input.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
@@ -33,7 +34,8 @@ const bool useFakeAnalyzer = bool.fromEnvironment(
 /// | GuidanceRepository | 최정혁 | DemoGuidanceRepository | 실제 앱 기능 맵 |
 /// | HistoryRepository | 최정혁 | InMemoryHistoryRepository | 로컬 DB 구현 |
 /// | CameraInput | 최정혁 | **PickerCameraInput** (image_picker) | — (교체함, 11/12) |
-/// | GalleryInput·InputCleanup | 최정혁 | Fake* (샘플 이미지) | 실제 갤러리·정리 구현 |
+/// | InputCleanup | 최정혁 | **FileInputCleanup** (앱 복사본·image_picker 잔여 정리, app_settings) | — (교체함, 11/13) |
+/// | GalleryInput | 최정혁 | FakeGalleryInput (샘플 이미지) | 실제 갤러리 구현 |
 /// | Sharer | 최정혁 | FakeSharer | share_plus 구현 |
 /// | MapUpdater | 최정혁 | FakeMapUpdater | Firebase 구현 (선택) |
 class AppDependencies {
@@ -78,7 +80,7 @@ AppDependencies bootstrap({bool? fake}) {
     history: InMemoryHistoryRepository(), // 최정혁: 로컬 DB 구현으로 교체
     galleryInput: FakeGalleryInput(files: files), // 최정혁: 실제 갤러리 구현으로 교체
     cameraInput: PickerCameraInput(), // 최정혁: image_picker (기기 기본 카메라)
-    inputCleanup: FakeInputCleanup(files: files), // 최정혁: 실제 구현으로 교체
+    inputCleanup: FileInputCleanup(), // 최정혁: 앱 복사본·image_picker 잔여 정리, 설정 열기
     sharer: FakeSharer(), // 최정혁: share_plus 구현으로 교체
     mapUpdater: FakeMapUpdater(), // 최정혁: Firebase 구현으로 교체 (선택)
   );

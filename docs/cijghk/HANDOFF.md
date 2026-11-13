@@ -13,3 +13,9 @@
 - 검증: `flutter analyze` 0건, `flutter test` 91건 통과(Windows). Android 36 **에뮬레이터**에서 촬영 `ok`·복사본 해제·취소 `cancelled`·권한 거부 `permissionDenied` 확인. 실기기 확인은 하지 않았다.
 - 권한 거부는 매니페스트에 `CAMERA`를 임시로 넣은 빌드로 확인했다(소스에는 넣지 않음).
 - 남은 확인·요청: `ai_log/2026-11-12_camera-input.md` 5장 (매니페스트 `CAMERA` 선언과 `kotlin.incremental=false`는 강민준에게 요청, 취소 때 남는 0바이트 파일은 `InputCleanup`에서 처리, 카메라 화면 연결은 지형주).
+
+### 2026-11-13 · `InputCleanup` (같은 브랜치 `feat/camera-input`)
+
+- 변경: `screen_guide/lib/features/capture/data/file_input_cleanup.dart`(새 파일), `lib/app/bootstrap.dart`(정리 줄), `pubspec.yaml`(`app_settings` 추가), 시험 2개 파일.
+- 검증: `flutter analyze` 0건, `flutter test` 102건 통과(Windows). Android 36 **에뮬레이터**에서 카메라 취소 때 남은 0바이트 파일·`sg_` 복사본이 `clearLeftovers`로 지워지고, `openAppSettings`로 앱 정보 화면이 열리는 것을 확인. 실기기 확인은 하지 않았다.
+- 남은 것: `ai_log/2026-11-13_input-cleanup.md` 5장.
