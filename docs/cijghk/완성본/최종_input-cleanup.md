@@ -1,7 +1,7 @@
 # 최종 · InputCleanup (앱 복사본 정리 · 권한 설정 열기)
 
 2026-11-13 · 최정혁 · PR #3 (`feat/camera-input`)
-작업 기록: `ai_log/2026-11-13_input-cleanup.md` · 설계: `데이터_입출력_설계.md` 4-1·4-3
+작업 기록: `../ai_log/2026-11-13_input-cleanup.md` · 설계: `../데이터_입출력_설계.md` 4-1·4-3
 
 ## 하는 일
 

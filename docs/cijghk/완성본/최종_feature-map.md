@@ -1,7 +1,7 @@
 # 최종 · 기능 맵 스키마 v1 + AssetGuidanceRepository
 
 2026-11-13 · 최정혁 · PR #3 (`feat/camera-input`)
-작업 기록: `ai_log/2026-11-13_feature-map.md` · 설계: `데이터_입출력_설계.md` 5장
+작업 기록: `../ai_log/2026-11-13_feature-map.md` · 설계: `../데이터_입출력_설계.md` 5장
 
 ## 하는 일
 

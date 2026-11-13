@@ -1,7 +1,7 @@
 # 최종 · GalleryInput (기기 사진 보관함에서 한 장)
 
 2026-11-13 · 최정혁 · PR #3 (`feat/camera-input`)
-작업 기록: `ai_log/2026-11-13_gallery-input.md` · 설계: `데이터_입출력_설계.md` 4-1·4-4
+작업 기록: `../ai_log/2026-11-13_gallery-input.md` · 설계: `../데이터_입출력_설계.md` 4-1·4-4
 
 ## 하는 일
 
