@@ -45,6 +45,26 @@ class AppCopyFiles {
     }
   }
 
+  /// 바이트를 새 `sg_` 폴더에 [name] 파일로 저장하고 경로를 돌려준다 (갤러리 사진처럼 파일 경로가 없는 원본).
+  ///
+  /// 바이트가 비어 있으면 [FileSystemException]. 이름은 영문·숫자·`._-`만 남긴다.
+  Future<String> saveBytes(String name, List<int> bytes) async {
+    if (bytes.isEmpty) throw FileSystemException('사진 내용이 비어 있다', name);
+    final safe = name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    final dir = await root.createTemp(prefix);
+    try {
+      final file = File(
+        '${dir.path}${Platform.pathSeparator}'
+        '${safe.isEmpty || safe.startsWith('.') ? 'image$safe' : safe}',
+      );
+      await file.writeAsBytes(bytes, flush: true);
+      return file.path;
+    } catch (_) {
+      await _deleteQuietly(dir);
+      rethrow;
+    }
+  }
+
   /// [path]가 이 도구가 만든 복사본인가: `root/sg_*/파일` 모양일 때만 true.
   bool isAppCopy(String path) {
     final parent = File(path).parent;
