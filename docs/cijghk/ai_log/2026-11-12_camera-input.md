@@ -68,7 +68,7 @@
 
 정정: 1차 기록 뒤 `cache/`에서 본 0바이트 파일 하나는 취소 흔적이 아니라 **카메라가 열려 있는 동안** image_picker가 만들어 둔 파일이었다(복사본과 이름이 같았다). 취소 때 0바이트가 남는 것은 2차에서 다시 확인했다.
 
-새로 발견: **취소하면 image_picker가 미리 만든 0바이트 파일이 `cache/`에 남는다** (`cache/<uuid>.jpg`, 0 bytes). 사진 내용은 없지만 쌓인다. 촬영 함수가 null을 돌려줘서 이 구현은 그 경로를 모른다 → `InputCleanup.clearLeftovers`에서 앱 `cache/`의 image_picker 잔여 파일도 정리하도록 다음 작업에서 정한다.
+새로 발견: **취소하면 image_picker가 미리 만든 0바이트 파일이 `cache/`에 남는다** (`cache/<uuid>.jpg`, 0 bytes). 사진 내용은 없지만 쌓인다. 촬영 함수가 null을 돌려줘서 이 구현은 그 경로를 모른다 → `InputCleanup.clearLeftovers`에서 앱 `cache/`의 image_picker 잔여 파일도 정리하도록 다음 작업에서 정한다. **(11/13 처리함: `FileInputCleanup`, `2026-11-13_input-cleanup.md`)**
 
 권한 거부 시험 경과: 매니페스트에 `CAMERA`를 **임시로** 넣고(시험 뒤 되돌림, 커밋 안 함) 다시 빌드·설치.
 1차: 앱 시작 시 `IllegalStateException: MlKitContext has not been initialized` (`MainActivity.kt:13` → `Analyzer.kt:22`, 강민준 코드)로 비정상 종료. 병합 매니페스트에는 `MlKitInitProvider`가 있었다. 덮어 설치(`install -r`) 직후 에뮬레이터 시스템 서비스가 잠시 응답하지 않던 때였다.
