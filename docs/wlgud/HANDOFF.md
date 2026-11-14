@@ -16,9 +16,10 @@
 | 376bab9 | 단위 3 점검: `shareConfirmed` 읽기 전용 |
 | b29f5d4 | 단위 4: `Shell`·진행 칸(`flow.progress`), 앱 셸 하단 탭, 뒤로는 `_back`이 장면별로 |
 | 44efb47 | 단위 5: `_go`의 단계 훅 `_onExit`·`_onEnter` — 분석 나갈 때 타이머 정지, 복구 들어올 때 실패 단계 기억, 공유 들어올 때 확인 값 지움 |
-| (다음 커밋) | 단위 1~5 전체 점검: 서식(`dart format`) 맞춤, 낡은 주석 정리, 기록 갱신 |
+| b75ee0a | 단위 1~5 전체 점검: 서식(`dart format`) 맞춤, 낡은 주석 정리, 기록 갱신 |
+| 이 HANDOFF를 바꾼 커밋 | 표를 Map → switch(`ruleFor`)로: 단계가 빠지면 컴파일 오류. 단계 설정표는 이것으로 닫음 |
 
-- 검증: `flutter analyze` 0건, `flutter test` 81건 통과 (시작 때 69건), `dart format` 0건
+- 검증: `flutter analyze` 0건, `flutter test` 80건 통과 (시작 때 69건, 컴파일러가 대신하는 시험 1건 지움), `dart format` 0건
 - 작업 기록: `ai_log/2026-11-14_단계설정표.md` (4-1에 설계 문서 대조 점검 표)
 
 ## 남은 확인
