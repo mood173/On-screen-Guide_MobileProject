@@ -282,7 +282,7 @@ void main() {
   });
 
   test(
-    '갤러리 권한 거부 → 오류 화면(PERMISSION_DENIED), 다른 이미지를 고르면 앞 복사본을 지운다',
+    '갤러리 권한 거부 → 권한 안내 화면 DENY(PERMISSION_DENIED), 다른 이미지를 고르면 앞 복사본을 지운다',
     () async {
       final denied = testFlow(
         gallery: FakeGalleryInput(
@@ -291,7 +291,8 @@ void main() {
         ),
       );
       await denied.dispatch(ActionId.captureGallery);
-      expect(denied.screen, ScreenId.e);
+      // 협업규격 3.4: 권한 거부는 오류 화면(E)이 아니라 권한 안내 화면(DENY)
+      expect(denied.screen, ScreenId.deny);
       expect(denied.error, ErrorCode.permissionDenied);
 
       final files = _RecordingFiles();
@@ -303,6 +304,51 @@ void main() {
       expect(f.picked, isNull);
     },
   );
+
+  // 협업규격 3.4 결과 → 화면 표 (4.2 4번 끝난 기준: 취소·거부·읽기 실패가 각각 맞는 화면으로)
+  group('입력 결과 → 화면 (갤러리 "사용")', () {
+    Future<GuideFlow> useWith(PickStatus status) async {
+      final f = testFlow(
+        gallery: FakeGalleryInput(
+          useStatus: status,
+          loadThumbnail: noThumbnail,
+        ),
+      );
+      await f.dispatch(ActionId.captureGallery); // H → G
+      await f.dispatch(ActionId.capturePick, SampleImage.settings.id); // → GS
+      await f.dispatch(ActionId.captureConfirm); // use()
+      return f;
+    }
+
+    test('취소 → 그 자리(GS) 유지, 오류 없음', () async {
+      final f = await useWith(PickStatus.cancelled);
+      expect(f.screen, ScreenId.gs);
+      expect(f.error, isNull);
+      expect(f.picked, isNull);
+    });
+
+    test('권한 거부 → DENY, 거부된 입력 방식 = 갤러리', () async {
+      final f = await useWith(PickStatus.permissionDenied);
+      expect(f.screen, ScreenId.deny);
+      expect(f.state, FlowState.denied);
+      expect(f.error, ErrorCode.permissionDenied);
+      expect(f.deniedInput, InputKind.gallery);
+    });
+
+    test('읽기 실패 → E(IMAGE_READ_FAILED)', () async {
+      final f = await useWith(PickStatus.readFailed);
+      expect(f.screen, ScreenId.e);
+      expect(f.error, ErrorCode.imageReadFailed);
+      expect(f.deniedInput, isNull);
+    });
+
+    test('홈으로 가면 거부 기록을 지운다', () async {
+      final f = await useWith(PickStatus.permissionDenied);
+      await f.dispatch(ActionId.navBack); // DENY의 뒤로 → 홈 (_back 기본 갈래)
+      expect(f.screen, ScreenId.h);
+      expect(f.deniedInput, isNull);
+    });
+  });
 
   test('준비 단계: start()가 남은 복사본 청소를 부른다', () async {
     final cleanup = _RecordingCleanup();

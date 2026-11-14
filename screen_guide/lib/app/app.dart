@@ -77,6 +77,8 @@ class _FlowShellState extends State<FlowShell> {
     ScreenId.d5 => GuideStepScreen(flow: flow),
     ScreenId.done => DoneScreen(flow: flow),
     ScreenId.e => ErrorScreen(flow: flow),
+    // 권한 안내 화면은 4.2 4번 단위 C에서 만든다. 그때까지 오류 화면이 PERMISSION_DENIED 문구를 보여 준다.
+    ScreenId.deny => ErrorScreen(flow: flow),
     _ => HomeScreen(flow: flow),
   };
 

@@ -105,6 +105,11 @@ class GuideFlow extends ChangeNotifier {
   bool get shareConfirmed => _shareConfirmed;
   bool _shareConfirmed = false;
 
+  /// 권한이 거부된 입력 방식 (협업규격 3.4 "거부된 입력 방식을 세션에 기록", 3.6 세션 값).
+  /// 권한 안내 화면(DENY)이 이 값을 보고 "설정 열기"와 "다른 방법으로 대신하기"를 고른다.
+  InputKind? get deniedInput => _deniedInput;
+  InputKind? _deniedInput;
+
   /// 아직 없는 기능을 눌렀을 때 한 번 보여 줄 문구. 화면이 보여 준 뒤 [clearNotice]를 부른다.
   String? notice;
 
@@ -205,7 +210,9 @@ class GuideFlow extends ChangeNotifier {
   Future<void> _openGallery() async {
     input = InputKind.gallery;
     final access = await _gallery.requestAccess();
-    if (access != PickStatus.ok) return _fail(ErrorCode.permissionDenied);
+    if (access != PickStatus.ok) {
+      return _onPickFailed(access, InputKind.gallery);
+    }
     galleryItems = await _gallery.recent();
     selectedId = null;
     _go(ScreenId.g, FlowState.idle);
@@ -222,15 +229,29 @@ class GuideFlow extends ChangeNotifier {
     if (id == null) return;
     await _releasePicked();
     final img = await _gallery.use(id);
-    switch (img.status) {
-      case PickStatus.ok when img.ok:
-        picked = img;
-        _go(ScreenId.gr, FlowState.picked);
+    if (!img.ok) return _onPickFailed(img.status, InputKind.gallery);
+    picked = img;
+    _go(ScreenId.gr, FlowState.picked);
+  }
+
+  /// 입력 포트의 실패 결과 → 화면 (협업규격 3.4 표). 갤러리·카메라가 같이 쓴다.
+  ///
+  /// | 결과 | 화면 |
+  /// |---|---|
+  /// | cancelled | 그 자리 유지 |
+  /// | permissionDenied | DENY (`PERMISSION_DENIED`), 거부된 입력 방식 기록 |
+  /// | readFailed | E (`IMAGE_READ_FAILED`) |
+  /// | ok인데 파일 경로 없음 | 읽기 실패로 본다 (쓸 수 있는 이미지가 없다) |
+  void _onPickFailed(PickStatus status, InputKind kind) {
+    switch (status) {
       case PickStatus.cancelled:
-        break; // 그 자리 유지
+        return;
       case PickStatus.permissionDenied:
-        _fail(ErrorCode.permissionDenied);
-      default:
+        _deniedInput = kind;
+        error = ErrorCode.permissionDenied;
+        _go(ScreenId.deny, FlowState.denied);
+      case PickStatus.readFailed:
+      case PickStatus.ok:
         _fail(ErrorCode.imageReadFailed);
     }
   }
@@ -426,6 +447,7 @@ class GuideFlow extends ChangeNotifier {
     slow = false;
     _shareConfirmed = false;
     _failedStage = null;
+    _deniedInput = null;
     _go(ScreenId.h, FlowState.idle);
   }
 
