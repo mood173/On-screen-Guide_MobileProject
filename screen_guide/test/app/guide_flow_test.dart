@@ -524,6 +524,47 @@ void main() {
     });
   });
 
+  // 권한 안내 화면 DENY의 버튼 (시스템설계 3-9, 협업규격 3.5)
+  group('권한 안내 DENY', () {
+    test('설정 열기 → 기기 설정을 열고 DENY에 머문다', () async {
+      final cleanup = _RecordingCleanup();
+      final f = testFlow(
+        cleanup: cleanup,
+        camera: FakeCameraInput(status: PickStatus.permissionDenied),
+      );
+      await f.dispatch(ActionId.captureCamera);
+      await f.dispatch(ActionId.captureCamera); // → DENY
+      await f.dispatch(ActionId.settingsOpenPermission);
+      expect(cleanup.settingsOpened, 1);
+      expect(f.screen, ScreenId.deny);
+    });
+
+    test('카메라 거부 → "갤러리에서 선택"(captureGallery) → 갤러리 목록', () async {
+      final f = testFlow(
+        camera: FakeCameraInput(status: PickStatus.permissionDenied),
+      );
+      await f.dispatch(ActionId.captureCamera);
+      await f.dispatch(ActionId.captureCamera); // → DENY
+      await f.dispatch(ActionId.captureGallery);
+      expect(f.screen, ScreenId.g);
+      expect(f.input, InputKind.gallery);
+    });
+
+    test('갤러리 거부 → 설정에서 허용 → "다시 시도"(captureGallery) → 갤러리 목록', () async {
+      final gallery = FakeGalleryInput(
+        access: PickStatus.permissionDenied,
+        loadThumbnail: noThumbnail,
+      );
+      final f = testFlow(gallery: gallery);
+      await f.dispatch(ActionId.captureGallery);
+      expect(f.screen, ScreenId.deny);
+
+      gallery.access = PickStatus.ok; // 사용자가 기기 설정에서 허용하고 돌아옴
+      await f.dispatch(ActionId.captureGallery);
+      expect(f.screen, ScreenId.g);
+    });
+  });
+
   test('준비 단계: start()가 남은 복사본 청소를 부른다', () async {
     final cleanup = _RecordingCleanup();
     testFlow(cleanup: cleanup).start();
@@ -584,10 +625,11 @@ void main() {
 
 class _RecordingCleanup implements InputCleanup {
   var cleared = 0;
+  var settingsOpened = 0;
   @override
   Future<void> clearLeftovers() async => cleared++;
   @override
-  Future<void> openAppSettings() async {}
+  Future<void> openAppSettings() async => settingsOpened++;
   @override
   Future<void> release(PickedImage image) async {}
 }

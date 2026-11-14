@@ -9,6 +9,7 @@ import 'package:screen_guide/features/guide/ui/done_screen.dart';
 import 'package:screen_guide/features/guide/ui/error_screen.dart';
 import 'package:screen_guide/features/guide/ui/guide_step_screen.dart';
 import 'package:screen_guide/features/guide/ui/result_screen.dart';
+import 'package:screen_guide/features/settings/ui/deny_screen.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/contracts/screen_id.dart';
 import 'package:screen_guide/shared/theme/app_theme.dart';
@@ -78,8 +79,7 @@ class _FlowShellState extends State<FlowShell> {
     ScreenId.d5 => GuideStepScreen(flow: flow),
     ScreenId.done => DoneScreen(flow: flow),
     ScreenId.e => ErrorScreen(flow: flow),
-    // 권한 안내 화면은 4.2 4번 단위 C에서 만든다. 그때까지 오류 화면이 PERMISSION_DENIED 문구를 보여 준다.
-    ScreenId.deny => ErrorScreen(flow: flow),
+    ScreenId.deny => DenyScreen(flow: flow),
     _ => HomeScreen(flow: flow),
   };
 

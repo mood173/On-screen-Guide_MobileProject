@@ -180,6 +180,9 @@ class GuideFlow extends ChangeNotifier {
         await _openGallery();
       case ActionId.captureCamera:
         await _openCamera();
+      case ActionId.settingsOpenPermission:
+        // 기기의 앱 권한 설정 화면을 연다 (협업규격 3.5). 화면은 그대로 — 돌아오면 DENY에서 다시 시도.
+        await _cleanup.openAppSettings();
       case ActionId.capturePick:
         if (arg is String) _pick(arg);
       case ActionId.captureConfirm:

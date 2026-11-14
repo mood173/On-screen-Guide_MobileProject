@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:screen_guide/app/app.dart';
 import 'package:screen_guide/features/analyze/data/fake_analyzer.dart';
+import 'package:screen_guide/features/capture/data/fake_input.dart';
+import 'package:screen_guide/features/capture/domain/image_input.dart';
 
 import 'support/test_flow.dart';
 
@@ -73,8 +75,11 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('input-camera')));
     await tester.pumpAndSettle();
 
+    // Figma CR(15:125) 문구
     expect(find.text('촬영한 사진'), findsOneWidget);
-    expect(find.text('카메라로 촬영  ·  이미지 1개'), findsOneWidget);
+    expect(find.text('촬영한 화면을 확인하세요'), findsOneWidget);
+    expect(find.text('카메라 촬영  ·  방금 전'), findsOneWidget);
+    expect(find.text('다시 촬영'), findsOneWidget);
     await tester.tap(find.text('이 화면 분석하기'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
@@ -84,5 +89,51 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
     expect(find.text('무엇을 하고 싶으세요?'), findsOneWidget);
+    expect(find.text('카메라 분석 결과'), findsOneWidget); // Figma RC 제목
+  });
+
+  // 권한 안내 화면: 거부된 입력 방식에 따라 문구·버튼 이름이 다르다 (기능별_검토_결론, 필수)
+  testWidgets('카메라 거부 → DENY "카메라 권한이 허용되지 않았어요" → 갤러리에서 선택', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.625;
+    addTearDown(tester.view.reset);
+
+    final flow = testFlow(
+      camera: FakeCameraInput(status: PickStatus.permissionDenied),
+    );
+    await tester.pumpWidget(ScreenGuideApp(flow: flow));
+    await tester.tap(find.byKey(const ValueKey('input-camera'))); // H → CP
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('input-camera'))); // 촬영 → 거부
+    await tester.pumpAndSettle();
+
+    expect(find.text('권한이 필요해요'), findsOneWidget);
+    expect(find.text('카메라 권한이\n허용되지 않았어요'), findsOneWidget);
+    expect(find.text('카메라 권한 확인'), findsOneWidget);
+    expect(find.text('실시간 권한 확인'), findsNothing, reason: '13장 X5');
+    await tester.tap(find.text('갤러리에서 선택'));
+    await tester.pumpAndSettle();
+    expect(find.text('최근 이미지'), findsOneWidget);
+  });
+
+  testWidgets('갤러리 거부 → DENY "사진 접근 권한이 허용되지 않았어요" → 다시 시도', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.625;
+    addTearDown(tester.view.reset);
+
+    final gallery = FakeGalleryInput(
+      access: PickStatus.permissionDenied,
+      loadThumbnail: noThumbnail,
+    );
+    await tester.pumpWidget(ScreenGuideApp(flow: testFlow(gallery: gallery)));
+    await tester.tap(find.byKey(const ValueKey('input-gallery')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('사진 접근 권한이\n허용되지 않았어요'), findsOneWidget);
+    expect(find.text('사진 권한 확인'), findsOneWidget);
+    gallery.access = PickStatus.ok; // 설정에서 허용하고 돌아옴
+    await tester.tap(find.text('다시 시도'));
+    await tester.pumpAndSettle();
+    expect(find.text('최근 이미지'), findsOneWidget);
   });
 }
