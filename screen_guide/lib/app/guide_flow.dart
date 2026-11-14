@@ -52,8 +52,7 @@ class GuideFlow extends ChangeNotifier {
   final GuidanceRepository _guidance; // 최정혁 (기능 맵)
   final HistoryRepository _history; // 최정혁 (기록)
   final GalleryInput _gallery; // 최정혁 (사진 가져오기)
-  // ignore: unused_field
-  final CameraInput _camera; // 최정혁 — 카메라 장면(CP)을 만들 때 사용
+  final CameraInput _camera; // 최정혁 (기기 기본 카메라)
   final InputCleanup _cleanup; // 최정혁
   // ignore: unused_field
   final Sharer _sharer; // 최정혁 — 공유(P → SHARE)를 만들 때 사용
@@ -105,6 +104,11 @@ class GuideFlow extends ChangeNotifier {
   bool get shareConfirmed => _shareConfirmed;
   bool _shareConfirmed = false;
 
+  /// 사진을 가져오는 중 (갤러리 권한·목록·사용, 카메라 촬영). 켜져 있으면 [allowed]가 모든 버튼을 잠근다.
+  /// 켜고 끄는 곳: `_openGallery`·`_confirm`·`_takePhoto`의 try/finally (어느 길로 끝나도 꺼진다).
+  bool get capturing => _capturing;
+  bool _capturing = false;
+
   /// 권한이 거부된 입력 방식 (협업규격 3.4 "거부된 입력 방식을 세션에 기록", 3.6 세션 값).
   /// 권한 안내 화면(DENY)이 이 값을 보고 "설정 열기"와 "다른 방법으로 대신하기"를 고른다.
   InputKind? get deniedInput => _deniedInput;
@@ -135,6 +139,9 @@ class GuideFlow extends ChangeNotifier {
   /// 표(고정)가 정한 버튼에서, 흐름의 상태에 따라 더 잠근다.
   /// 표 = "이 장면에서 원래 누를 수 있는 것", 여기 = "지금 이 순간 막아야 하는 것".
   Set<ActionId> get allowed {
+    // 사진을 가져오는 중에는 모든 버튼 잠금 (연타 차단, 11/14 점검에서 발견).
+    // 카메라가 두 번 열리거나, 가져오는 사이 뒤로 가서 늦게 온 사진이 엉뚱한 화면을 띄우는 일을 막는다.
+    if (_capturing) return {};
     final s = {...StageTable.always, ...StageTable.allowedOn(screen)};
     // 대상을 찾는 중에는 단계 버튼 잠금 (3-6, 중복 실행 차단)
     if (locating) s.removeAll(_stepActions);
@@ -171,6 +178,8 @@ class GuideFlow extends ChangeNotifier {
     switch (id) {
       case ActionId.captureGallery:
         await _openGallery();
+      case ActionId.captureCamera:
+        await _openCamera();
       case ActionId.capturePick:
         if (arg is String) _pick(arg);
       case ActionId.captureConfirm:
@@ -209,13 +218,18 @@ class GuideFlow extends ChangeNotifier {
   // ───────────── 입력 (갤러리) ─────────────
   Future<void> _openGallery() async {
     input = InputKind.gallery;
-    final access = await _gallery.requestAccess();
-    if (access != PickStatus.ok) {
-      return _onPickFailed(access, InputKind.gallery);
+    _capturing = true;
+    try {
+      final access = await _gallery.requestAccess();
+      if (access != PickStatus.ok) {
+        return _onPickFailed(access, InputKind.gallery);
+      }
+      galleryItems = await _gallery.recent();
+      selectedId = null;
+      _go(ScreenId.g, FlowState.idle);
+    } finally {
+      _capturing = false; // 어느 길로 끝나도 잠금을 푼다
     }
-    galleryItems = await _gallery.recent();
-    selectedId = null;
-    _go(ScreenId.g, FlowState.idle);
   }
 
   void _pick(String id) {
@@ -227,11 +241,16 @@ class GuideFlow extends ChangeNotifier {
   Future<void> _confirm() async {
     final id = selectedId;
     if (id == null) return;
-    await _releasePicked();
-    final img = await _gallery.use(id);
-    if (!img.ok) return _onPickFailed(img.status, InputKind.gallery);
-    picked = img;
-    _go(ScreenId.gr, FlowState.picked);
+    _capturing = true;
+    try {
+      await _releasePicked();
+      final img = await _gallery.use(id);
+      if (!img.ok) return _onPickFailed(img.status, InputKind.gallery);
+      picked = img;
+      _go(ScreenId.gr, FlowState.picked);
+    } finally {
+      _capturing = false;
+    }
   }
 
   /// 입력 포트의 실패 결과 → 화면 (협업규격 3.4 표). 갤러리·카메라가 같이 쓴다.
@@ -256,8 +275,45 @@ class GuideFlow extends ChangeNotifier {
     }
   }
 
-  /// 다른 이미지 고르기: 지금 이미지의 복사본을 지우고 목록으로.
+  // ───────────── 입력 (카메라) ─────────────
+
+  /// 카메라 버튼(`captureCamera`, 단계 설정표상 H·CP·E에서만 열림).
+  /// 홈에서 처음 고르면 권한 설명(CP)부터 (시스템설계 3-3), CP·E에서는 바로 기기 카메라를 연다
+  /// (11/14 결정: 설명은 한 번이면 충분). CR·RC의 "다시 찍기"는 `captureRetake` → [_retake]로 온다.
+  Future<void> _openCamera() async {
+    input = InputKind.camera;
+    if (screen == ScreenId.h) {
+      _go(ScreenId.cp, FlowState.idle);
+      return;
+    }
+    await _takePhoto();
+  }
+
+  /// 기기 기본 카메라로 한 장 찍는다 (13장 X2: 앱 안 카메라 화면 없음).
+  /// 앞 사진은 **새 사진을 받은 뒤에** 지운다. 취소하면 앞 사진이 그대로 남아 지금 화면(CR 등)을 계속 그릴 수 있다.
+  Future<void> _takePhoto() async {
+    _capturing = true;
+    try {
+      final img = await _camera.takePhoto();
+      if (!img.ok) return _onPickFailed(img.status, InputKind.camera);
+      await _releasePicked();
+      picked = img;
+      result = null;
+      error = null;
+      _go(ScreenId.cr, FlowState.picked);
+    } finally {
+      _capturing = false;
+    }
+  }
+
+  /// 갤러리 세션이면 [gallery], 카메라 세션이면 [camera] 장면.
+  /// 같은 장면을 입력 방식만 달리 부르는 곳(분석 중·결과·확인)에서 쓴다 (시스템설계 3-0).
+  ScreenId _scene({required ScreenId gallery, required ScreenId camera}) =>
+      input == InputKind.camera ? camera : gallery;
+
+  /// 다시 고르기: 카메라 세션이면 바로 다시 찍고, 갤러리면 지금 이미지의 복사본을 지우고 목록으로.
   Future<void> _retake() async {
+    if (input == InputKind.camera) return _takePhoto();
     await _releasePicked();
     selectedId = null;
     result = null;
@@ -308,7 +364,7 @@ class GuideFlow extends ChangeNotifier {
 
   Future<void> _analyzeFirst() async {
     if (picked?.ok != true) return;
-    _go(ScreenId.ga, FlowState.analyzing);
+    _go(_scene(gallery: ScreenId.ga, camera: ScreenId.ca), FlowState.analyzing);
     notifyListeners();
     final r = await _analyze();
     if (r == null) return;
@@ -316,12 +372,15 @@ class GuideFlow extends ChangeNotifier {
     if (r.screenId == null) return _fail(ErrorCode.unknownScreen);
     result = r;
     availableActions = await _guidance.actionsFor(r.screenId!);
-    _go(ScreenId.rg, FlowState.identified);
+    _go(
+      _scene(gallery: ScreenId.rg, camera: ScreenId.rc),
+      FlowState.identified,
+    );
   }
 
-  /// 분석 취소 → 확인 장면(GR)으로. 요청 번호 버리기·타이머 정지는 _onExit(analyze)가 한다.
+  /// 분석 취소 → 확인 장면(GR / CR)으로. 요청 번호 버리기·타이머 정지는 _onExit(analyze)가 한다.
   void _cancel() {
-    _go(ScreenId.gr, FlowState.picked);
+    _go(_scene(gallery: ScreenId.gr, camera: ScreenId.cr), FlowState.picked);
   }
 
   // ───────────── 안내 ─────────────
@@ -407,10 +466,15 @@ class GuideFlow extends ChangeNotifier {
         _go(ScreenId.g, FlowState.idle);
       case ScreenId.gr:
         _go(ScreenId.gs, FlowState.idle);
-      case ScreenId.ga:
+      case ScreenId.cr:
+        _go(ScreenId.cp, FlowState.idle); // 찍은 사진 → 권한 설명(촬영 버튼) 한 칸 뒤
+      case ScreenId.ga || ScreenId.ca:
         _cancel();
-      case ScreenId.rg:
-        _go(ScreenId.gr, FlowState.picked);
+      case ScreenId.rg || ScreenId.rc:
+        _go(
+          _scene(gallery: ScreenId.gr, camera: ScreenId.cr),
+          FlowState.picked,
+        );
       case ScreenId.d1 ||
           ScreenId.d2 ||
           ScreenId.d3 ||
@@ -422,7 +486,10 @@ class GuideFlow extends ChangeNotifier {
         } else {
           _pendingId = null;
           locating = false;
-          _go(ScreenId.rg, FlowState.identified);
+          _go(
+            _scene(gallery: ScreenId.rg, camera: ScreenId.rc),
+            FlowState.identified,
+          );
         }
       default:
         await _reset();

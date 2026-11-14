@@ -7,7 +7,8 @@ import 'package:screen_guide/shared/cells/screen_image.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/theme/app_tokens.dart';
 
-/// GR · 선택한 이미지 (Figma 15:155)
+/// GR · 선택한 이미지 (Figma 15:155) / CR · 촬영한 사진 (15:125).
+/// 같은 장면이라 위젯 하나, 입력 방식만 다르다 (시스템설계 3-0).
 class ReviewScreen extends StatelessWidget {
   const ReviewScreen({super.key, required this.flow});
   final GuideFlow flow;
@@ -18,7 +19,7 @@ class ReviewScreen extends StatelessWidget {
     VoidCallback? on(ActionId id) =>
         flow.allows(id) ? () => flow.dispatch(id) : null;
     return GuideScaffold(
-      title: '선택한 이미지',
+      title: flow.screen.title, // GR "선택한 이미지" / CR "촬영한 사진"
       onBack: () => flow.dispatch(ActionId.navBack),
       body: [
         ScreenHeading(

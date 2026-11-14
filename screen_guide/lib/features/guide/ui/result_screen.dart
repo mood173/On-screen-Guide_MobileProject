@@ -6,7 +6,7 @@ import 'package:screen_guide/shared/cells/screen_image.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/theme/app_tokens.dart';
 
-/// RG · 갤러리 분석 결과 (Figma 15:167)
+/// RG · 갤러리 분석 결과 (Figma 15:167) / RC · 카메라 분석 결과 (15:137). 위젯 하나 (시스템설계 3-0).
 ///
 /// 미리보기(인식한 요소 테두리) + 이 화면에서 안내받을 수 있는 기능 목록 + 개인정보 후보 요약.
 /// 기능 입력은 중간 보고서 기준(12.1 ①)대로 목록에서 고르는 방식이다.

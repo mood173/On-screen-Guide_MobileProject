@@ -84,6 +84,39 @@ class _RecordingFiles implements ImageFiles {
   Future<void> clearLeftovers() async {}
 }
 
+/// 진짜 카메라처럼: 열려 있는 동안 또 부르면 실패(readFailed). 호출 수를 센다.
+class _SlowCamera implements CameraInput {
+  var calls = 0;
+  var _open = false;
+  @override
+  Future<PickedImage> takePhoto() async {
+    calls++;
+    if (_open) {
+      return const PickedImage.failed(PickStatus.readFailed, InputKind.camera);
+    }
+    _open = true;
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    _open = false;
+    return const PickedImage(
+      status: PickStatus.ok,
+      path: '/cache/sg_cam/photo.png',
+      input: InputKind.camera,
+    );
+  }
+}
+
+/// 갤러리 "사용"이 시간이 걸리는 가짜. 호출 수를 센다.
+class _SlowGallery extends FakeGalleryInput {
+  _SlowGallery() : super(loadThumbnail: noThumbnail);
+  var useCalls = 0;
+  @override
+  Future<PickedImage> use(String id) async {
+    useCalls++;
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    return super.use(id);
+  }
+}
+
 void main() {
   test('갤러리 흐름: H → G → GS → GR → GA → RG → D1 → DONE', () async {
     final f = _flow();
@@ -276,7 +309,8 @@ void main() {
 
   test('준비 중인 기능은 안내 문구만 남긴다', () async {
     final f = _flow();
-    await f.dispatch(ActionId.captureCamera);
+    // 카메라는 4.2 4번 단위 B에서 연결됨 → 아직 화면이 없는 기록 탭으로 확인
+    await f.dispatch(ActionId.navHistory);
     expect(f.screen, ScreenId.h);
     expect(f.notice, isNotNull);
   });
@@ -347,6 +381,146 @@ void main() {
       await f.dispatch(ActionId.navBack); // DENY의 뒤로 → 홈 (_back 기본 갈래)
       expect(f.screen, ScreenId.h);
       expect(f.deniedInput, isNull);
+    });
+  });
+
+  // 카메라 흐름 (시스템설계 3-0·3-3, 협업규격 3.4, 4.2 4번)
+  group('카메라 흐름', () {
+    test('H → CP → 촬영 → CR → CA → RC, 입력 방식 = 카메라', () async {
+      final f = testFlow();
+      await f.dispatch(ActionId.captureCamera); // 홈에서 처음: 권한 설명부터
+      expect(f.screen, ScreenId.cp);
+      expect(f.input, InputKind.camera);
+
+      await f.dispatch(ActionId.captureCamera); // CP에서: 기기 카메라
+      expect(f.screen, ScreenId.cr);
+      expect(f.state, FlowState.picked);
+      expect(f.picked!.input, InputKind.camera);
+
+      await f.dispatch(ActionId.analyzeRun);
+      expect(f.screen, ScreenId.rc, reason: '카메라 세션의 결과 장면');
+      expect(f.availableActions, isNotEmpty);
+    });
+
+    Future<GuideFlow> shootWith(PickStatus status) async {
+      final f = testFlow(camera: FakeCameraInput(status: status));
+      await f.dispatch(ActionId.captureCamera); // → CP
+      await f.dispatch(ActionId.captureCamera); // 촬영
+      return f;
+    }
+
+    test('촬영 취소 → CP 그대로', () async {
+      final f = await shootWith(PickStatus.cancelled);
+      expect(f.screen, ScreenId.cp);
+      expect(f.picked, isNull);
+    });
+
+    test('카메라 권한 거부 → DENY, 거부된 입력 방식 = 카메라', () async {
+      final f = await shootWith(PickStatus.permissionDenied);
+      expect(f.screen, ScreenId.deny);
+      expect(f.deniedInput, InputKind.camera);
+    });
+
+    test('읽기 실패 → E(IMAGE_READ_FAILED)', () async {
+      final f = await shootWith(PickStatus.readFailed);
+      expect(f.screen, ScreenId.e);
+      expect(f.error, ErrorCode.imageReadFailed);
+    });
+
+    test('분석 취소 → CR, 결과에서 뒤로 → CR, CR에서 뒤로 → CP', () async {
+      final f = testFlow(
+        analyzer: FakeAnalyzer(delay: const Duration(milliseconds: 30)),
+      );
+      await f.dispatch(ActionId.captureCamera);
+      await f.dispatch(ActionId.captureCamera); // → CR
+      final running = f.dispatch(ActionId.analyzeRun);
+      expect(f.screen, ScreenId.ca);
+      await f.dispatch(ActionId.analyzeCancel);
+      expect(f.screen, ScreenId.cr);
+      await running;
+
+      await f.dispatch(ActionId.analyzeRun); // → RC
+      expect(f.screen, ScreenId.rc);
+      await f.dispatch(ActionId.navBack);
+      expect(f.screen, ScreenId.cr);
+      await f.dispatch(ActionId.navBack);
+      expect(f.screen, ScreenId.cp);
+    });
+
+    test('CR에서 다시 찍기 → CP를 거치지 않고 바로 촬영, 앞 사진 복사본을 지운다', () async {
+      final files = _RecordingFiles();
+      final camera = FakeCameraInput(files: files);
+      final f = testFlow(files: files, camera: camera);
+      await f.dispatch(ActionId.captureCamera);
+      await f.dispatch(ActionId.captureCamera); // 첫 사진
+      final first = f.picked!.path;
+
+      await f.dispatch(ActionId.captureRetake);
+      expect(f.screen, ScreenId.cr);
+      expect(f.picked!.path, isNot(first));
+      expect(files.released, [first], reason: '협업규격 3.4: 다시 고를 때 삭제');
+    });
+
+    test('다시 찍기를 취소하면 앞 사진이 남고 CR에 머문다', () async {
+      final files = _RecordingFiles();
+      final camera = FakeCameraInput(files: files);
+      final f = testFlow(files: files, camera: camera);
+      await f.dispatch(ActionId.captureCamera);
+      await f.dispatch(ActionId.captureCamera);
+      final first = f.picked!.path;
+
+      camera.status = PickStatus.cancelled;
+      await f.dispatch(ActionId.captureRetake);
+      expect(f.screen, ScreenId.cr);
+      expect(f.picked!.path, first);
+      expect(files.released, isEmpty);
+    });
+  });
+
+  // 사진을 가져오는 중에는 모든 버튼 잠금 (11/14 점검에서 재현한 연타 문제)
+  group('연타 차단', () {
+    test('CP에서 촬영 버튼을 두 번 → 카메라는 한 번만, 오류 화면으로 가지 않는다', () async {
+      final cam = _SlowCamera();
+      final f = testFlow(camera: cam);
+      await f.dispatch(ActionId.captureCamera); // → CP
+      final seen = <ScreenId>[];
+      f.addListener(() => seen.add(f.screen));
+
+      final first = f.dispatch(ActionId.captureCamera);
+      expect(f.capturing, isTrue);
+      expect(f.allowed, isEmpty, reason: '가져오는 중에는 뒤로도 잠금');
+      final second = f.dispatch(ActionId.captureCamera); // 연타
+      await Future.wait([first, second]);
+
+      expect(cam.calls, 1);
+      expect(seen, isNot(contains(ScreenId.e)));
+      expect(f.screen, ScreenId.cr);
+      expect(f.capturing, isFalse, reason: '끝나면 잠금이 풀린다');
+    });
+
+    test('갤러리 "선택한 이미지 사용"을 두 번 → 한 번만 가져온다 (복사본이 하나 더 남지 않음)', () async {
+      final gallery = _SlowGallery();
+      final f = testFlow(gallery: gallery);
+      await f.dispatch(ActionId.captureGallery);
+      await f.dispatch(ActionId.capturePick, SampleImage.settings.id);
+
+      final first = f.dispatch(ActionId.captureConfirm);
+      final second = f.dispatch(ActionId.captureConfirm); // 연타
+      await Future.wait([first, second]);
+
+      expect(gallery.useCalls, 1);
+      expect(f.screen, ScreenId.gr);
+    });
+
+    test('실패로 끝나도 잠금이 풀린다', () async {
+      final f = testFlow(
+        camera: FakeCameraInput(status: PickStatus.permissionDenied),
+      );
+      await f.dispatch(ActionId.captureCamera);
+      await f.dispatch(ActionId.captureCamera); // → DENY
+      expect(f.screen, ScreenId.deny);
+      expect(f.capturing, isFalse);
+      expect(f.allows(ActionId.captureGallery), isTrue);
     });
   });
 

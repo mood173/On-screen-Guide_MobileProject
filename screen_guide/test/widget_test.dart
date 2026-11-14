@@ -52,4 +52,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('잘 따라오셨어요!'), findsOneWidget);
   });
+
+  // 카메라 세션에서 CR·CA·RC가 갤러리 화면 위젯을 재사용해 그려지는지 (시스템설계 3-0)
+  testWidgets('홈에서 카메라 → 촬영 → 촬영한 사진 → 사진 분석 중 → 분석 결과까지 화면이 넘어간다', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.625;
+    addTearDown(tester.view.reset);
+
+    final flow = testFlow(
+      analyzer: FakeAnalyzer(delay: const Duration(milliseconds: 300)),
+    );
+    await tester.pumpWidget(ScreenGuideApp(flow: flow));
+
+    await tester.tap(find.byKey(const ValueKey('input-camera'))); // H → CP
+    await tester.pumpAndSettle();
+    // CP 화면은 4.2 4번 단위 C에서 만든다. 그때까지 홈 화면이 대신 보이고, 카메라 타일이 촬영 버튼 역할을 한다.
+    // CP → 촬영 → CR
+    await tester.tap(find.byKey(const ValueKey('input-camera')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('촬영한 사진'), findsOneWidget);
+    expect(find.text('카메라로 촬영  ·  이미지 1개'), findsOneWidget);
+    await tester.tap(find.text('이 화면 분석하기'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('사진 분석 중'), findsOneWidget);
+    expect(find.text('카메라 촬영 · 기기 내부에서 처리 중'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(find.text('무엇을 하고 싶으세요?'), findsOneWidget);
+  });
 }

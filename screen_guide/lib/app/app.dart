@@ -67,9 +67,10 @@ class _FlowShellState extends State<FlowShell> {
   Widget _screen() => switch (flow.screen) {
     ScreenId.h => HomeScreen(flow: flow),
     ScreenId.g || ScreenId.gs => GalleryScreen(flow: flow),
-    ScreenId.gr => ReviewScreen(flow: flow),
-    ScreenId.ga => AnalyzingScreen(flow: flow),
-    ScreenId.rg => ResultScreen(flow: flow),
+    // 갤러리·카메라가 같은 장면이면 위젯 하나 (시스템설계 3-0). CP 화면은 단위 C에서 만든다.
+    ScreenId.gr || ScreenId.cr => ReviewScreen(flow: flow),
+    ScreenId.ga || ScreenId.ca => AnalyzingScreen(flow: flow),
+    ScreenId.rg || ScreenId.rc => ResultScreen(flow: flow),
     ScreenId.d1 ||
     ScreenId.d2 ||
     ScreenId.d3 ||
