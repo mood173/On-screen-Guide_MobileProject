@@ -101,7 +101,7 @@ class GuideFlow extends ChangeNotifier {
 
   /// 공유 전 확인(P)에서 "확인했어요"를 눌렀는가. 꺼져 있으면 `shareSend`를 잠근다.
   /// 화면이 바꿀 수 없게 비공개로 두고 읽기만 열어 둔다 (협업규격 3.6: 세션 값은 흐름이 가진다).
-  /// 켜는 곳(shareConfirm)과 공유 단계에 들어올 때 끄는 곳은 공유 화면을 만들 때(협업규격 4.2 5번) 넣는다.
+  /// 공유 단계에 들어올 때 끄는 곳은 [_onEnter]. 켜는 곳(shareConfirm)은 공유 화면을 만들 때(협업규격 4.2 5번) 넣는다.
   bool get shareConfirmed => _shareConfirmed;
   bool _shareConfirmed = false;
 
@@ -131,12 +131,10 @@ class GuideFlow extends ChangeNotifier {
   /// 표 = "이 장면에서 원래 누를 수 있는 것", 여기 = "지금 이 순간 막아야 하는 것".
   Set<ActionId> get allowed {
     final s = {...StageTable.always, ...StageTable.allowedOn(screen)};
-    if (locating) {
-      s.removeAll(_stepActions); // 대상을 찾는 중에는 단계 버튼 잠금 (3-6, 중복 실행 차단)
-    }
-    if (!_shareConfirmed) {
-      s.remove(ActionId.shareSend); // P에서 확인하기 전에는 보낼 수 없다 (기능별_검토_결론 5장 관문, 필수)
-    }
+    // 대상을 찾는 중에는 단계 버튼 잠금 (3-6, 중복 실행 차단)
+    if (locating) s.removeAll(_stepActions);
+    // P에서 확인하기 전에는 보낼 수 없다 (기능별_검토_결론 5장 관문, 필수)
+    if (!_shareConfirmed) s.remove(ActionId.shareSend);
     return s;
   }
 

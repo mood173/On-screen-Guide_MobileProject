@@ -185,7 +185,7 @@ void main() {
     expect(hold.pending, 0);
   });
 
-  // 단위 5: 분석 단계를 나갈 때 타이머 정지 (_onExit)
+  // 시스템설계 3-4 "나갈 때 타이머 정지" (_onExit)
   test('분석 중 뒤로(취소) → 시간이 지나도 slow가 켜지지 않는다 (3-4 나갈 때 타이머 정지)', () async {
     final f = testFlow(
       analyzer: FakeAnalyzer(delay: const Duration(milliseconds: 80)),
@@ -197,7 +197,8 @@ void main() {
     await f.dispatch(ActionId.navBack); // 분석의 뒤로 = 취소
     expect(f.screen, ScreenId.gr);
 
-    await Future<void>.delayed(const Duration(milliseconds: 50)); // slowAfter 지남
+    // slowAfter(20ms)가 지나도록 기다린다
+    await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(f.slow, isFalse, reason: '타이머가 멈췄다');
     await running;
     expect(f.screen, ScreenId.gr, reason: '늦게 온 응답은 무시');

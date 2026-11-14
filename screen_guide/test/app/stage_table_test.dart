@@ -34,7 +34,7 @@ void main() {
     expect(opened, [ScreenId.share]);
   });
 
-  // 단위 3: GuideFlow의 관문이 표를 그대로 쓰는지 (상태 잠금이 없을 때).
+  // GuideFlow의 관문이 표를 그대로 쓰는지 (상태 잠금이 없을 때).
   test('GuideFlow 관문 = 표 결과 (모든 화면, shareSend 제외)', () {
     final flow = testFlow();
     for (final s in ScreenId.values) {
@@ -60,7 +60,7 @@ void main() {
     });
   });
 
-  // 단위 4: 화면 틀
+  // 화면 틀 (시스템설계 4-1)
   test('셸과 진행 칸이 시스템설계 4-1·3장 표와 같다', () {
     const expected = <Stage, (Shell, int?)>{
       Stage.ready: (Shell.start, null),
@@ -86,9 +86,8 @@ void main() {
   test('앱 셸 화면에서는 하단 탭 3개가 열리고, 다른 셸에서는 안 열린다', () {
     for (final s in ScreenId.values) {
       final isApp = StageTable.ruleOf(s).shell == Shell.app;
-      final opened = StageTable.allowedOn(s).containsAll(
-        StageTable.appShellTabs,
-      );
+      final opened = StageTable.allowedOn(s)
+          .containsAll(StageTable.appShellTabs);
       expect(opened, isApp, reason: s.code);
     }
   });
