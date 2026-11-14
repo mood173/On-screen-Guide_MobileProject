@@ -56,7 +56,7 @@ class DenyScreen extends StatelessWidget {
             children: [
               Text(
                 camera ? '다른 방법으로도 시작할 수 있어요' : '이렇게 다시 시도해 보세요',
-                style: AppText.listTitle,
+                style: AppText.listTitle.copyWith(fontSize: 16), // Figma 16
               ),
               const SizedBox(height: 12),
               Text(
