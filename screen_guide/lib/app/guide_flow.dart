@@ -153,7 +153,7 @@ class GuideFlow extends ChangeNotifier {
   int? get progress {
     final stage = screen.stage == Stage.recover ? _failedStage : screen.stage;
     if (stage == null) return null;
-    return StageTable.rules[stage]!.progress;
+    return StageTable.ruleFor(stage).progress;
   }
 
   /// 마지막으로 실패한 단계. 복구 단계에 들어올 때(_onEnter) 정하고 [_reset]이 지운다.

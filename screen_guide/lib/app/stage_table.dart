@@ -66,12 +66,14 @@ class StageTable {
     ActionId.navSettings,
   };
 
-  static const rules = <Stage, StageRule>{
+  /// 단계 → 규칙. Map이 아니라 switch라서 단계가 하나라도 빠지면 컴파일되지 않는다
+  /// (단계 연결·훅·결과 변환과 같은 원칙, default 없음).
+  static StageRule ruleFor(Stage stage) => switch (stage) {
     // 3-2 준비: 앱 시작 중이라 누를 버튼이 없다.
-    Stage.ready: StageRule(shell: Shell.start, allowed: {}),
+    Stage.ready => const StageRule(shell: Shell.start, allowed: {}),
 
     // 3-2 대기 (H)
-    Stage.waiting: StageRule(
+    Stage.waiting => const StageRule(
       shell: Shell.app,
       allowed: {
         ActionId.captureGallery,
@@ -83,7 +85,7 @@ class StageTable {
     ),
 
     // 3-3 입력. 문서는 단계 전체를 한 줄로 적었고, 장면마다 지금 할 수 있는 것만 연다.
-    Stage.input: StageRule(
+    Stage.input => const StageRule(
       shell: Shell.guide,
       progress: 1, // "입력"
       allowed: {
@@ -111,28 +113,28 @@ class StageTable {
     ),
 
     // 3-4 분석: 취소 하나. 다시 요청은 받지 않는다 (중복 분석 차단).
-    Stage.analyze: StageRule(
+    Stage.analyze => const StageRule(
       shell: Shell.guide,
       progress: 2, // "분석"
       allowed: {ActionId.analyzeCancel},
     ),
 
     // 3-5 선택: 저장·공유는 열지 않는다 (기능별_검토_결론 13장 X1).
-    Stage.choose: StageRule(
+    Stage.choose => const StageRule(
       shell: Shell.guide,
       progress: 3, // "기능 선택"
       allowed: {ActionId.guideStart, ActionId.captureRetake},
     ),
 
     // 3-6 안내. "대상을 찾는 중에는 셋 다 잠금"은 표가 아니라 흐름의 상태(locating)라 GuideFlow에 남긴다.
-    Stage.guide: StageRule(
+    Stage.guide => const StageRule(
       shell: Shell.guide,
       progress: 4, // "안내" (단계 n/N은 화면이 따로 그린다)
       allowed: {ActionId.guideNext, ActionId.guidePrev, ActionId.guideMismatch},
     ),
 
     // 3-7 마무리
-    Stage.finish: StageRule(
+    Stage.finish => const StageRule(
       shell: Shell.guide,
       progress: 5, // "완료"
       allowed: {ActionId.historySave, ActionId.sharePrepare, ActionId.navHome},
@@ -141,7 +143,7 @@ class StageTable {
     // 3-8 공유. shareSend는 SHARE 장면에만 연다.
     // 표만으로는 "P를 거쳤는가"를 알 수 없다 (SHARE로 바로 가는 길이 생기면 뚫림).
     // 기능별_검토_결론 5장 관문(필수): 세션의 "확인함" 값이 켜져 있을 때만 shareSend — 흐름 상태라 GuideFlow에서 확인한다.
-    Stage.share: StageRule(
+    Stage.share => const StageRule(
       shell: Shell.share,
       allowed: {ActionId.shareConfirm, ActionId.shareSend, ActionId.navBack},
       byScene: {
@@ -151,7 +153,7 @@ class StageTable {
     ),
 
     // 3-9 복구: 장면마다 버튼이 다르다.
-    Stage.recover: StageRule(
+    Stage.recover => const StageRule(
       shell: Shell.guide, // 진행 칸은 실패한 단계 것 (GuideFlow.progress)
       allowed: {
         ActionId.settingsOpenPermission,
@@ -175,7 +177,7 @@ class StageTable {
     ),
 
     // 3-9 기록·설정. 문서는 두 화면을 한 줄로 적었지만, 화면에 없는 버튼이 열리지 않게 장면별로 나눈다 (11/14 결정).
-    Stage.records: StageRule(
+    Stage.records => const StageRule(
       shell: Shell.app,
       allowed: {
         ActionId.historyOpen,
@@ -198,12 +200,11 @@ class StageTable {
     ),
 
     // 실시간 안내 (N01, 일정 제외): 자리만 둔다. 하게 되면 이 줄을 채운다.
-    Stage.overlay: StageRule(shell: Shell.overlay, allowed: {}),
+    Stage.overlay => const StageRule(shell: Shell.overlay, allowed: {}),
   };
 
   /// 이 화면이 속한 단계의 규칙.
-  /// 모든 단계가 [rules]에 있다는 것은 시험이 확인하므로 `!`를 쓴다.
-  static StageRule ruleOf(ScreenId screen) => rules[screen.stage]!;
+  static StageRule ruleOf(ScreenId screen) => ruleFor(screen.stage);
 
   /// 이 화면에서 허용하는 버튼 (뒤로 제외): 단계(장면)의 버튼 + 앱 셸이면 하단 탭.
   static Set<ActionId> allowedOn(ScreenId screen) {

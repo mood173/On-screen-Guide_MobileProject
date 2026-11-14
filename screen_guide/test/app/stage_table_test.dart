@@ -7,14 +7,11 @@ import 'package:screen_guide/shared/contracts/screen_id.dart';
 import '../support/test_flow.dart';
 
 void main() {
-  test('모든 단계에 규칙이 있다', () {
-    for (final stage in Stage.values) {
-      expect(StageTable.rules.containsKey(stage), isTrue, reason: '$stage');
-    }
-  });
+  // "모든 단계에 규칙이 있다"는 ruleFor가 switch라 컴파일러가 확인한다 (시험 불필요).
 
   test('장면별 목록은 그 단계의 화면이고, 단계 기본보다 넓지 않다', () {
-    for (final MapEntry(key: stage, value: rule) in StageTable.rules.entries) {
+    for (final stage in Stage.values) {
+      final rule = StageTable.ruleFor(stage);
       for (final MapEntry(key: screen, value: ids) in rule.byScene.entries) {
         expect(screen.stage, stage, reason: '${screen.code}는 $stage가 아님');
         expect(
@@ -77,7 +74,7 @@ void main() {
     };
     for (final MapEntry(key: stage, value: (shell, progress))
         in expected.entries) {
-      final rule = StageTable.rules[stage]!;
+      final rule = StageTable.ruleFor(stage);
       expect(rule.shell, shell, reason: '$stage 셸');
       expect(rule.progress, progress, reason: '$stage 진행 칸');
     }
