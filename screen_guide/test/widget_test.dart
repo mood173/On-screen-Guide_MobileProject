@@ -76,6 +76,11 @@ void main() {
     expect(find.text('카메라 접근이 필요해요'), findsOneWidget);
     expect(find.text('촬영할 때만 카메라를 사용해요.\n찍은 사진은 안내가 끝나면 지워요.'), findsOneWidget);
     expect(find.textContaining('체험'), findsNothing);
+    // 아이콘 상자는 Figma 64×64 (11/14 에뮬레이터에서 화면 너비로 늘어난 적 있음)
+    expect(
+      tester.getSize(find.byKey(const ValueKey('icon-box'))),
+      const Size(64, 64),
+    );
     await tester.tap(find.text('카메라 허용')); // CP → 촬영 → CR
     await tester.pumpAndSettle();
 
@@ -115,6 +120,10 @@ void main() {
     expect(find.text('카메라 권한이\n허용되지 않았어요'), findsOneWidget);
     expect(find.text('카메라 권한 확인'), findsOneWidget);
     expect(find.text('실시간 권한 확인'), findsNothing, reason: '13장 X5');
+    expect(
+      tester.getSize(find.byKey(const ValueKey('icon-box'))),
+      const Size(64, 64),
+    );
     await tester.tap(find.text('갤러리에서 선택'));
     await tester.pumpAndSettle();
     expect(find.text('최근 이미지'), findsOneWidget);

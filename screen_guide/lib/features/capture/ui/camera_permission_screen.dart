@@ -27,18 +27,24 @@ class CameraPermissionScreen extends StatelessWidget {
       onBack: () => flow.dispatch(ActionId.navBack),
       body: [
         // Figma "Permission icon": 흰 상자 64 + 보라 선 아이콘
-        Container(
-          width: 64,
-          height: 64,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Icon(
-            Icons.photo_camera_outlined,
-            size: 40,
-            color: AppColors.primary,
+        // 화면 틀(GuideScaffold)이 내용을 가로로 꽉 채워서, 64 크기를 지키려면 왼쪽 정렬로 감싼다
+        // (11/14 에뮬레이터에서 상자가 화면 너비로 늘어난 것을 발견).
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            key: const ValueKey('icon-box'), // 시험이 64 크기를 확인한다
+            width: 64,
+            height: 64,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.photo_camera_outlined,
+              size: 40,
+              color: AppColors.primary,
+            ),
           ),
         ),
         // 설명 글자가 Figma에서 14라 ScreenHeading(설명 13) 대신 직접 쓴다.

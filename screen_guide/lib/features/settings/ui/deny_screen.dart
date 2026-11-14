@@ -31,18 +31,24 @@ class DenyScreen extends StatelessWidget {
       onBack: () => flow.dispatch(ActionId.navBack),
       body: [
         // Figma "State icon": 흰 상자 64 + 주황 선 아이콘
-        Container(
-          width: 64,
-          height: 64,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(
-            camera ? Icons.no_photography_outlined : Icons.lock_outline,
-            size: 40,
-            color: AppColors.caution,
+        // 화면 틀(GuideScaffold)이 내용을 가로로 꽉 채워서, 64 크기를 지키려면 왼쪽 정렬로 감싼다
+        // (11/14 에뮬레이터에서 상자가 화면 너비로 늘어난 것을 발견).
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            key: const ValueKey('icon-box'), // 시험이 64 크기를 확인한다
+            width: 64,
+            height: 64,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              camera ? Icons.no_photography_outlined : Icons.lock_outline,
+              size: 40,
+              color: AppColors.caution,
+            ),
           ),
         ),
         ScreenHeading(
