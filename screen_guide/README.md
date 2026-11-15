@@ -33,7 +33,7 @@ flutter run --dart-define=FAKE_ANALYZER=false   # 실제 Kotlin 분석기 (ML Ki
 
 ```powershell
 flutter analyze
-flutter test                                        # Dart: 계약·예시 파일·포트 공용 시험·의존 규칙·흐름·화면 (69건)
+flutter test                                        # Dart: 계약·예시 파일·포트 공용 시험·의존 규칙·흐름·단계 설정표·화면 (101건)
 cd android; .\gradlew.bat :app:testDebugUnitTest    # Kotlin: GuideLogicTest (28건)
 ```
 
@@ -41,19 +41,26 @@ cd android; .\gradlew.bat :app:testDebugUnitTest    # Kotlin: GuideLogicTest (28
 
 ## 지금 되는 것
 
-갤러리 흐름 전체가 Figma 화면대로 동작한다 (가짜 구현 + 샘플 이미지 2장). 흐름은 포트만 알고,
+갤러리·카메라 흐름이 Figma 화면대로 동작한다 (가짜 구현 + 샘플 이미지 2장). 흐름은 포트만 알고,
 가짜/진짜는 `app/bootstrap.dart`에서 고른다.
 
 ```
-H 홈 → G 최근 이미지 → GS 선택 → GR 선택한 이미지 → GA 분석 중 → RG 분석 결과
-     → D1~Dn 단계별 안내 → DONE 안내 완료          (실패하면 E 다시 시도)
+갤러리: H 홈 → G 최근 이미지 → GS 선택 → GR 선택한 이미지 → GA 분석 중 → RG 분석 결과
+카메라: H 홈 → CP 카메라 접근 → (기기 기본 카메라) → CR 촬영한 사진 → CA 사진 분석 중 → RC 분석 결과
+     → D1~Dn 단계별 안내 → DONE 안내 완료
+권한 거부 → DENY 권한이 필요해요 (설정 열기 / 갤러리)      그 밖의 실패 → E 다시 시도
 ```
+
+- 버튼의 켜짐·꺼짐은 **단계 설정표**(`app/stage_table.dart`, 시스템설계 3장)가 정한다. 화면 → 단계는 `app/stage.dart`.
+  단계에 들어갈 때·나갈 때 할 일(분석 타이머 정지, 실패 단계 기억, 공유 확인 값 지우기)은 `GuideFlow._onEnter/_onExit`
+- 입력 결과 → 화면은 협업규격 3.4 표대로: 취소 → 그 자리, 권한 거부 → DENY(거부된 입력 방식 기록), 읽기 실패 → E
+- 사진을 가져오는 중에는 모든 버튼을 잠근다 (촬영·사용 버튼 연타 방지)
 
 - 샘플: `demo.settings`(기능 2개, 1단계), `demo.chat`(기능 1개, 2단계, 개인정보 후보 5건)
 - 가짜 분석기의 글자·위치는 샘플을 실제 ML Kit로 분석한 값이라 테두리가 이미지와 맞는다.
   화면 식별·대상 찾기 규칙(A·B·C)은 Kotlin 규칙의 복사본이다 (기준은 Kotlin)
 - 사진은 앱 임시 폴더의 복사본으로 다루고, 홈으로 돌아가거나 다시 고르면 지운다. 앱 시작 때 남은 복사본도 지운다
-- 카메라·실시간 스캔·기록·설정 버튼은 "준비 중" 안내만 띄운다. 결과(RG)에는 저장·공유가 없다 (X1)
+- 실시간 스캔·기록·설정 버튼은 "준비 중" 안내만 띄운다. 결과(RG·RC)에는 저장·공유가 없다 (X1)
 
 ## 구조
 
@@ -62,7 +69,9 @@ lib/
   main.dart                  앱 시작 (app/app.dart를 띄운다)
   app/                       ← 지형주: 흐름 입구·조립·셸
     bootstrap.dart           실제/가짜 구현을 고르는 유일한 곳 (각자 자기 포트 줄만 수정)
-    guide_flow.dart          현재 화면·상태, Gate(화면별 허용 행동), dispatch
+    guide_flow.dart          현재 화면·상태, 관문(allowed = 단계 설정표 − 지금 상태로 잠금), dispatch, 단계 진입·이탈
+    stage.dart               단계 11개, 화면 → 단계 (ScreenId.stage)
+    stage_table.dart         단계 설정표: 단계별 허용 버튼(장면별로 좁히기)·셸·진행 칸
     app.dart, home_screen.dart   화면 전환 셸, 홈(H)
   shared/
     contracts/               ← 공동: ActionId, ErrorCode, FlowState, ScreenId, 채널 요청·응답(analysis.dart)
@@ -72,9 +81,10 @@ lib/
     domain/                  ← 공동: 포트(인터페이스)·모델
     data/                    ← 최정혁: 포트 구현 (analyze/data만 지형주, 강민준과 협의)
     ui/                      ← 지형주: 화면
-    capture/       GalleryInput·CameraInput·InputCleanup · 갤러리(G·GS)·확인(GR) · 가짜 입력·샘플 이미지
-    analyze/       ScreenAnalyzer · MethodChannelAnalyzer(진짜)/FakeAnalyzer(가짜)·샘플 정답 · 분석 중(GA)
-    guide/         결과(RG)·단계(D1~D5)·완료(DONE)·오류(E)
+    capture/       GalleryInput·CameraInput·InputCleanup · 갤러리(G·GS)·카메라 접근(CP)·확인(GR·CR) · 가짜 입력·샘플 이미지
+    analyze/       ScreenAnalyzer · MethodChannelAnalyzer(진짜)/FakeAnalyzer(가짜)·샘플 정답 · 분석 중(GA·CA)
+    guide/         결과(RG·RC)·단계(D1~D5)·완료(DONE)·오류(E)
+    settings/      권한 안내(DENY)
     guidance_map/  GuidanceRepository·MapUpdater · 체험용 기능 맵
     history/       HistoryRepository · 메모리 구현
     share/         Sharer(ShareOutcome) · 가짜 구현
