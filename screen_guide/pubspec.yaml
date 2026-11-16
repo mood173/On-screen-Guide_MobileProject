@@ -7,8 +7,11 @@ environment:
   sdk: ^3.13.7
 
 dependencies:
+  app_settings: ^9.0.1
   flutter:
     sdk: flutter
+  image_picker: ^1.2.4
+  photo_manager: ^3.12.0
 
 dev_dependencies:
   flutter_test:
@@ -19,3 +22,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/samples/
+    - assets/feature_maps/sample_v1.json

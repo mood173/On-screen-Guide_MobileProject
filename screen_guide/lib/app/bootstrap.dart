@@ -3,9 +3,12 @@ import 'package:screen_guide/features/analyze/data/fake_analyzer.dart';
 import 'package:screen_guide/features/analyze/data/method_channel_analyzer.dart';
 import 'package:screen_guide/features/analyze/domain/screen_analyzer.dart';
 import 'package:screen_guide/features/capture/data/fake_input.dart';
+import 'package:screen_guide/features/capture/data/file_input_cleanup.dart';
 import 'package:screen_guide/features/capture/data/image_files.dart';
+import 'package:screen_guide/features/capture/data/media_gallery_input.dart';
+import 'package:screen_guide/features/capture/data/picker_camera_input.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
-import 'package:screen_guide/features/guidance_map/data/demo_guidance.dart';
+import 'package:screen_guide/features/guidance_map/data/asset_guidance_repository.dart';
 import 'package:screen_guide/features/guidance_map/data/fake_map_updater.dart';
 import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
 import 'package:screen_guide/features/guidance_map/domain/map_updater.dart';
@@ -29,9 +32,11 @@ const bool useFakeAnalyzer = bool.fromEnvironment(
 /// | 포트 | 구현 담당 | 지금 | 진짜로 바꿀 때 |
 /// |---|---|---|---|
 /// | ScreenAnalyzer | 강민준 | FakeAnalyzer | MethodChannelAnalyzer (Kotlin 채널이 계약 v1 형식이 되면) |
-/// | GuidanceRepository | 최정혁 | DemoGuidanceRepository | 실제 앱 기능 맵 |
+/// | GuidanceRepository | 최정혁 | **AssetGuidanceRepository** (앱에 든 JSON 맵, 지금은 체험용과 같은 내용) | 실제 앱 맵 내용으로 JSON 교체 (11/27) |
 /// | HistoryRepository | 최정혁 | InMemoryHistoryRepository | 로컬 DB 구현 |
-/// | GalleryInput·CameraInput·InputCleanup | 최정혁 | Fake* (샘플 이미지) | 실제 갤러리·image_picker 구현 |
+/// | CameraInput | 최정혁 | **PickerCameraInput** (image_picker) | — (교체함, 11/12) |
+/// | InputCleanup | 최정혁 | **FileInputCleanup** (앱 복사본·image_picker 잔여 정리, app_settings) | — (교체함, 11/13) |
+/// | GalleryInput | 최정혁 | **MediaGalleryInput** (photo_manager) — `FAKE_ANALYZER=false`일 때만. 가짜 분석기 모드는 FakeGalleryInput(샘플) | 실제 분석기가 기본이 되면 항상 진짜 |
 /// | Sharer | 최정혁 | FakeSharer | share_plus 구현 |
 /// | MapUpdater | 최정혁 | FakeMapUpdater | Firebase 구현 (선택) |
 class AppDependencies {
@@ -72,11 +77,15 @@ AppDependencies bootstrap({bool? fake}) {
   final files = CacheImageFiles(); // 가짜 입력이 샘플을 앱 임시 폴더에 복사할 때 쓴다
   return AppDependencies(
     analyzer: useFake ? FakeAnalyzer() : MethodChannelAnalyzer(), // 강민준
-    guidance: const DemoGuidanceRepository(), // 최정혁: 실제 앱 기능 맵으로 교체
+    guidance: AssetGuidanceRepository(), // 최정혁: assets/feature_maps/ JSON 맵
     history: InMemoryHistoryRepository(), // 최정혁: 로컬 DB 구현으로 교체
-    galleryInput: FakeGalleryInput(files: files), // 최정혁: 실제 갤러리 구현으로 교체
-    cameraInput: FakeCameraInput(files: files), // 최정혁: image_picker 구현으로 교체
-    inputCleanup: FakeInputCleanup(files: files), // 최정혁: 실제 구현으로 교체
+    // 최정혁: 실제 분석기면 기기 사진 보관함, 가짜 분석기면 체험용 샘플 갤러리
+    // (가짜 분석기는 샘플 파일 이름으로 정답을 찾으므로 기기 사진으로는 체험 흐름이 돌지 않는다)
+    galleryInput: useFake
+        ? FakeGalleryInput(files: files)
+        : MediaGalleryInput(),
+    cameraInput: PickerCameraInput(), // 최정혁: image_picker (기기 기본 카메라)
+    inputCleanup: FileInputCleanup(), // 최정혁: 앱 복사본·image_picker 잔여 정리, 설정 열기
     sharer: FakeSharer(), // 최정혁: share_plus 구현으로 교체
     mapUpdater: FakeMapUpdater(), // 최정혁: Firebase 구현으로 교체 (선택)
   );
