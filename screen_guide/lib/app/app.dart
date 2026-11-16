@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:screen_guide/app/guide_flow.dart';
 import 'package:screen_guide/app/home_screen.dart';
 import 'package:screen_guide/features/analyze/ui/analyzing_screen.dart';
+import 'package:screen_guide/features/capture/ui/camera_permission_screen.dart';
 import 'package:screen_guide/features/capture/ui/gallery_screen.dart';
 import 'package:screen_guide/features/capture/ui/review_screen.dart';
 import 'package:screen_guide/features/guide/ui/done_screen.dart';
 import 'package:screen_guide/features/guide/ui/error_screen.dart';
 import 'package:screen_guide/features/guide/ui/guide_step_screen.dart';
 import 'package:screen_guide/features/guide/ui/result_screen.dart';
+import 'package:screen_guide/features/settings/ui/deny_screen.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/contracts/screen_id.dart';
 import 'package:screen_guide/shared/theme/app_theme.dart';
@@ -66,10 +68,12 @@ class _FlowShellState extends State<FlowShell> {
 
   Widget _screen() => switch (flow.screen) {
     ScreenId.h => HomeScreen(flow: flow),
+    ScreenId.cp => CameraPermissionScreen(flow: flow),
     ScreenId.g || ScreenId.gs => GalleryScreen(flow: flow),
-    ScreenId.gr => ReviewScreen(flow: flow),
-    ScreenId.ga => AnalyzingScreen(flow: flow),
-    ScreenId.rg => ResultScreen(flow: flow),
+    // 갤러리·카메라가 같은 장면이면 위젯 하나 (시스템설계 3-0).
+    ScreenId.gr || ScreenId.cr => ReviewScreen(flow: flow),
+    ScreenId.ga || ScreenId.ca => AnalyzingScreen(flow: flow),
+    ScreenId.rg || ScreenId.rc => ResultScreen(flow: flow),
     ScreenId.d1 ||
     ScreenId.d2 ||
     ScreenId.d3 ||
@@ -77,6 +81,7 @@ class _FlowShellState extends State<FlowShell> {
     ScreenId.d5 => GuideStepScreen(flow: flow),
     ScreenId.done => DoneScreen(flow: flow),
     ScreenId.e => ErrorScreen(flow: flow),
+    ScreenId.deny => DenyScreen(flow: flow),
     _ => HomeScreen(flow: flow),
   };
 

@@ -5,6 +5,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:screen_guide/app/stage.dart';
+import 'package:screen_guide/app/stage_table.dart';
 import 'package:screen_guide/features/analyze/domain/screen_analyzer.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
@@ -50,8 +52,7 @@ class GuideFlow extends ChangeNotifier {
   final GuidanceRepository _guidance; // 최정혁 (기능 맵)
   final HistoryRepository _history; // 최정혁 (기록)
   final GalleryInput _gallery; // 최정혁 (사진 가져오기)
-  // ignore: unused_field
-  final CameraInput _camera; // 최정혁 — 카메라 장면(CP)을 만들 때 사용
+  final CameraInput _camera; // 최정혁 (기기 기본 카메라)
   final InputCleanup _cleanup; // 최정혁
   // ignore: unused_field
   final Sharer _sharer; // 최정혁 — 공유(P → SHARE)를 만들 때 사용
@@ -97,6 +98,22 @@ class GuideFlow extends ChangeNotifier {
   /// 분석이 [slowAfter]를 넘김 → "조금 더 걸리고 있어요"
   bool slow = false;
 
+  /// 공유 전 확인(P)에서 "확인했어요"를 눌렀는가. 꺼져 있으면 `shareSend`를 잠근다.
+  /// 화면이 바꿀 수 없게 비공개로 두고 읽기만 열어 둔다 (협업규격 3.6: 세션 값은 흐름이 가진다).
+  /// 공유 단계에 들어올 때 끄는 곳은 [_onEnter]. 켜는 곳(shareConfirm)은 공유 화면을 만들 때(협업규격 4.2 5번) 넣는다.
+  bool get shareConfirmed => _shareConfirmed;
+  bool _shareConfirmed = false;
+
+  /// 사진을 가져오는 중 (갤러리 권한·목록·사용, 카메라 촬영). 켜져 있으면 [allowed]가 모든 버튼을 잠근다.
+  /// 켜고 끄는 곳: `_openGallery`·`_confirm`·`_takePhoto`의 try/finally (어느 길로 끝나도 꺼진다).
+  bool get capturing => _capturing;
+  bool _capturing = false;
+
+  /// 권한이 거부된 입력 방식 (협업규격 3.4 "거부된 입력 방식을 세션에 기록", 3.6 세션 값).
+  /// 권한 안내 화면(DENY)이 이 값을 보고 "설정 열기"와 "다른 방법으로 대신하기"를 고른다.
+  InputKind? get deniedInput => _deniedInput;
+  InputKind? _deniedInput;
+
   /// 아직 없는 기능을 눌렀을 때 한 번 보여 줄 문구. 화면이 보여 준 뒤 [clearNotice]를 부른다.
   String? notice;
 
@@ -117,55 +134,43 @@ class GuideFlow extends ChangeNotifier {
     unawaited(_mapUpdater.checkForUpdate());
   }
 
-  // ───────────── Gate: 화면별로 허용하는 행동 ─────────────
-  static const _always = {ActionId.navBack, ActionId.navHome};
-  static const _gate = <ScreenId, Set<ActionId>>{
-    // 대기 (시스템설계_최종 3-2)
-    ScreenId.h: {
-      ActionId.captureGallery,
-      ActionId.captureCamera,
-      ActionId.overlaySetup,
-      ActionId.navHistory,
-      ActionId.navSettings,
-    },
-    ScreenId.g: {ActionId.capturePick},
-    ScreenId.gs: {
-      ActionId.capturePick,
-      ActionId.captureConfirm,
-      ActionId.captureRetake,
-    },
-    ScreenId.gr: {ActionId.analyzeRun, ActionId.captureRetake},
-    ScreenId.ga: {ActionId.analyzeCancel},
-    // 선택: 저장·공유는 열지 않는다 (기능별_검토_결론 13장 X1)
-    ScreenId.rg: {ActionId.guideStart, ActionId.captureRetake},
-    ScreenId.d1: _stepActions,
-    ScreenId.d2: _stepActions,
-    ScreenId.d3: _stepActions,
-    ScreenId.d4: _stepActions,
-    ScreenId.d5: _stepActions,
-    ScreenId.done: {ActionId.historySave, ActionId.sharePrepare},
-    // 복구 (시스템설계_최종 3-9). 화면은 세션의 입력 방식에 맞는 버튼만 보여 준다
-    ScreenId.e: {
-      ActionId.captureRetake,
-      ActionId.captureCamera,
-      ActionId.captureGallery,
-    },
-  };
+  // ───────────── 관문: 단계 설정표를 본다 (시스템설계_최종 3-1, 6-2 ①) ─────────────
+
+  /// 표(고정)가 정한 버튼에서, 흐름의 상태에 따라 더 잠근다.
+  /// 표 = "이 장면에서 원래 누를 수 있는 것", 여기 = "지금 이 순간 막아야 하는 것".
+  Set<ActionId> get allowed {
+    // 사진을 가져오는 중에는 모든 버튼 잠금 (연타 차단, 11/14 점검에서 발견).
+    // 카메라가 두 번 열리거나, 가져오는 사이 뒤로 가서 늦게 온 사진이 엉뚱한 화면을 띄우는 일을 막는다.
+    if (_capturing) return {};
+    final s = {...StageTable.always, ...StageTable.allowedOn(screen)};
+    // 대상을 찾는 중에는 단계 버튼 잠금 (3-6, 중복 실행 차단)
+    if (locating) s.removeAll(_stepActions);
+    // P에서 확인하기 전에는 보낼 수 없다 (기능별_검토_결론 5장 관문, 필수)
+    if (!_shareConfirmed) s.remove(ActionId.shareSend);
+    return s;
+  }
+
   static const _stepActions = {
     ActionId.guideNext,
     ActionId.guidePrev,
     ActionId.guideMismatch,
   };
 
-  Set<ActionId> get allowed {
-    var s = {..._always, ...?_gate[screen]};
-    if (locating) {
-      s = s.difference(_stepActions); // 다시 찾는 중에는 단계 버튼 잠금 (중복 실행 차단)
-    }
-    return s;
+  bool allows(ActionId id) => allowed.contains(id);
+
+  // ───────────── 화면 틀: 진행 표시 (시스템설계_최종 4-1) ─────────────
+
+  /// 진행 표시 5칸 중 지금 칸 (1 입력 ~ 5 완료). 진행 표시가 없는 화면이면 null.
+  /// 복구 화면은 실패한 단계의 칸에 멈춘다 (3-9).
+  int? get progress {
+    final stage = screen.stage == Stage.recover ? _failedStage : screen.stage;
+    if (stage == null) return null;
+    return StageTable.ruleFor(stage).progress;
   }
 
-  bool allows(ActionId id) => allowed.contains(id);
+  /// 마지막으로 실패한 단계. 복구 단계에 들어올 때(_onEnter) 정하고 [_reset]이 지운다.
+  /// 오류 화면끼리(E ↔ DENY)는 같은 복구 단계라 _onEnter가 돌지 않으므로 처음 실패한 단계가 남는다.
+  Stage? _failedStage;
 
   // ───────────── dispatch ─────────────
   Future<void> dispatch(ActionId id, [Object? arg]) async {
@@ -173,6 +178,11 @@ class GuideFlow extends ChangeNotifier {
     switch (id) {
       case ActionId.captureGallery:
         await _openGallery();
+      case ActionId.captureCamera:
+        await _openCamera();
+      case ActionId.settingsOpenPermission:
+        // 기기의 앱 권한 설정 화면을 연다 (협업규격 3.5). 화면은 그대로 — 돌아오면 DENY에서 다시 시도.
+        await _cleanup.openAppSettings();
       case ActionId.capturePick:
         if (arg is String) _pick(arg);
       case ActionId.captureConfirm:
@@ -211,11 +221,18 @@ class GuideFlow extends ChangeNotifier {
   // ───────────── 입력 (갤러리) ─────────────
   Future<void> _openGallery() async {
     input = InputKind.gallery;
-    final access = await _gallery.requestAccess();
-    if (access != PickStatus.ok) return _fail(ErrorCode.permissionDenied);
-    galleryItems = await _gallery.recent();
-    selectedId = null;
-    _go(ScreenId.g, FlowState.idle);
+    _capturing = true;
+    try {
+      final access = await _gallery.requestAccess();
+      if (access != PickStatus.ok) {
+        return _onPickFailed(access, InputKind.gallery);
+      }
+      galleryItems = await _gallery.recent();
+      selectedId = null;
+      _go(ScreenId.g, FlowState.idle);
+    } finally {
+      _capturing = false; // 어느 길로 끝나도 잠금을 푼다
+    }
   }
 
   void _pick(String id) {
@@ -227,23 +244,79 @@ class GuideFlow extends ChangeNotifier {
   Future<void> _confirm() async {
     final id = selectedId;
     if (id == null) return;
-    await _releasePicked();
-    final img = await _gallery.use(id);
-    switch (img.status) {
-      case PickStatus.ok when img.ok:
-        picked = img;
-        _go(ScreenId.gr, FlowState.picked);
+    _capturing = true;
+    try {
+      await _releasePicked();
+      final img = await _gallery.use(id);
+      if (!img.ok) return _onPickFailed(img.status, InputKind.gallery);
+      picked = img;
+      _go(ScreenId.gr, FlowState.picked);
+    } finally {
+      _capturing = false;
+    }
+  }
+
+  /// 입력 포트의 실패 결과 → 화면 (협업규격 3.4 표). 갤러리·카메라가 같이 쓴다.
+  ///
+  /// | 결과 | 화면 |
+  /// |---|---|
+  /// | cancelled | 그 자리 유지 |
+  /// | permissionDenied | DENY (`PERMISSION_DENIED`), 거부된 입력 방식 기록 |
+  /// | readFailed | E (`IMAGE_READ_FAILED`) |
+  /// | ok인데 파일 경로 없음 | 읽기 실패로 본다 (쓸 수 있는 이미지가 없다) |
+  void _onPickFailed(PickStatus status, InputKind kind) {
+    switch (status) {
       case PickStatus.cancelled:
-        break; // 그 자리 유지
+        return;
       case PickStatus.permissionDenied:
-        _fail(ErrorCode.permissionDenied);
-      default:
+        _deniedInput = kind;
+        error = ErrorCode.permissionDenied;
+        _go(ScreenId.deny, FlowState.denied);
+      case PickStatus.readFailed:
+      case PickStatus.ok:
         _fail(ErrorCode.imageReadFailed);
     }
   }
 
-  /// 다른 이미지 고르기: 지금 이미지의 복사본을 지우고 목록으로.
+  // ───────────── 입력 (카메라) ─────────────
+
+  /// 카메라 버튼(`captureCamera`, 단계 설정표상 H·CP·E에서만 열림).
+  /// 홈에서 처음 고르면 권한 설명(CP)부터 (시스템설계 3-3), CP·E에서는 바로 기기 카메라를 연다
+  /// (11/14 결정: 설명은 한 번이면 충분). CR·RC의 "다시 찍기"는 `captureRetake` → [_retake]로 온다.
+  Future<void> _openCamera() async {
+    input = InputKind.camera;
+    if (screen == ScreenId.h) {
+      _go(ScreenId.cp, FlowState.idle);
+      return;
+    }
+    await _takePhoto();
+  }
+
+  /// 기기 기본 카메라로 한 장 찍는다 (13장 X2: 앱 안 카메라 화면 없음).
+  /// 앞 사진은 **새 사진을 받은 뒤에** 지운다. 취소하면 앞 사진이 그대로 남아 지금 화면(CR 등)을 계속 그릴 수 있다.
+  Future<void> _takePhoto() async {
+    _capturing = true;
+    try {
+      final img = await _camera.takePhoto();
+      if (!img.ok) return _onPickFailed(img.status, InputKind.camera);
+      await _releasePicked();
+      picked = img;
+      result = null;
+      error = null;
+      _go(ScreenId.cr, FlowState.picked);
+    } finally {
+      _capturing = false;
+    }
+  }
+
+  /// 갤러리 세션이면 [gallery], 카메라 세션이면 [camera] 장면.
+  /// 같은 장면을 입력 방식만 달리 부르는 곳(분석 중·결과·확인)에서 쓴다 (시스템설계 3-0).
+  ScreenId _scene({required ScreenId gallery, required ScreenId camera}) =>
+      input == InputKind.camera ? camera : gallery;
+
+  /// 다시 고르기: 카메라 세션이면 바로 다시 찍고, 갤러리면 지금 이미지의 복사본을 지우고 목록으로.
   Future<void> _retake() async {
+    if (input == InputKind.camera) return _takePhoto();
     await _releasePicked();
     selectedId = null;
     result = null;
@@ -294,7 +367,7 @@ class GuideFlow extends ChangeNotifier {
 
   Future<void> _analyzeFirst() async {
     if (picked?.ok != true) return;
-    _go(ScreenId.ga, FlowState.analyzing);
+    _go(_scene(gallery: ScreenId.ga, camera: ScreenId.ca), FlowState.analyzing);
     notifyListeners();
     final r = await _analyze();
     if (r == null) return;
@@ -302,14 +375,15 @@ class GuideFlow extends ChangeNotifier {
     if (r.screenId == null) return _fail(ErrorCode.unknownScreen);
     result = r;
     availableActions = await _guidance.actionsFor(r.screenId!);
-    _go(ScreenId.rg, FlowState.identified);
+    _go(
+      _scene(gallery: ScreenId.rg, camera: ScreenId.rc),
+      FlowState.identified,
+    );
   }
 
+  /// 분석 취소 → 확인 장면(GR / CR)으로. 요청 번호 버리기·타이머 정지는 _onExit(analyze)가 한다.
   void _cancel() {
-    _pendingId = null;
-    _slowTimer?.cancel();
-    slow = false;
-    _go(ScreenId.gr, FlowState.picked); // 분석 취소 → 이전 화면 유지
+    _go(_scene(gallery: ScreenId.gr, camera: ScreenId.cr), FlowState.picked);
   }
 
   // ───────────── 안내 ─────────────
@@ -383,7 +457,7 @@ class GuideFlow extends ChangeNotifier {
   void _fail(ErrorCode code) {
     error = code;
     locating = false;
-    _go(ScreenId.e, FlowState.error);
+    _go(ScreenId.e, FlowState.error); // 실패한 단계 기억은 _onEnter(recover)가 한다
   }
 
   Future<void> _back() async {
@@ -395,10 +469,15 @@ class GuideFlow extends ChangeNotifier {
         _go(ScreenId.g, FlowState.idle);
       case ScreenId.gr:
         _go(ScreenId.gs, FlowState.idle);
-      case ScreenId.ga:
+      case ScreenId.cr:
+        _go(ScreenId.cp, FlowState.idle); // 찍은 사진 → 권한 설명(촬영 버튼) 한 칸 뒤
+      case ScreenId.ga || ScreenId.ca:
         _cancel();
-      case ScreenId.rg:
-        _go(ScreenId.gr, FlowState.picked);
+      case ScreenId.rg || ScreenId.rc:
+        _go(
+          _scene(gallery: ScreenId.gr, camera: ScreenId.cr),
+          FlowState.picked,
+        );
       case ScreenId.d1 ||
           ScreenId.d2 ||
           ScreenId.d3 ||
@@ -410,7 +489,10 @@ class GuideFlow extends ChangeNotifier {
         } else {
           _pendingId = null;
           locating = false;
-          _go(ScreenId.rg, FlowState.identified);
+          _go(
+            _scene(gallery: ScreenId.rg, camera: ScreenId.rc),
+            FlowState.identified,
+          );
         }
       default:
         await _reset();
@@ -433,12 +515,71 @@ class GuideFlow extends ChangeNotifier {
     locating = false;
     error = null;
     slow = false;
+    _shareConfirmed = false;
+    _failedStage = null;
+    _deniedInput = null;
     _go(ScreenId.h, FlowState.idle);
   }
 
+  /// 화면을 바꾼다. 단계까지 바뀌면 나가는 단계를 정리하고 들어가는 단계를 준비한다 (6-2, 6-4 6번).
+  /// 같은 단계 안의 이동(G → GS, D1 → D2)에서는 아무것도 하지 않는다.
   void _go(ScreenId s, FlowState st) {
+    final from = screen.stage;
+    final to = s.stage;
     screen = s;
     state = st;
+    if (from != to) {
+      _onExit(from);
+      _onEnter(to, from: from);
+    }
+  }
+
+  // ───────────── 단계에 들어갈 때·나갈 때 (시스템설계_최종 3-1 "들어갈 때 준비 / 나갈 때 정리") ─────────────
+  //
+  // 여기에는 바로 끝나는 일(값 바꾸기, 타이머 멈추기)만 둔다.
+  // 파일 삭제처럼 기다려야 하는 일은 _go가 기다릴 수 없어서 _reset·_retake·_confirm에 둔다 (협업규격 3.4 호출 시점).
+  // switch에 default가 없어 단계가 새로 생기면 컴파일 오류로 빠진 갈래를 알려 준다.
+
+  void _onExit(Stage stage) {
+    switch (stage) {
+      case Stage.analyze:
+        // 3-4 나갈 때: 타이머 정지. 요청 번호도 버려서 늦게 온 응답은 무시된다 (계약 v1 결정 3).
+        _pendingId = null;
+        _slowTimer?.cancel();
+        slow = false;
+      case Stage.ready:
+      case Stage.waiting:
+      case Stage.input:
+      case Stage.choose:
+      case Stage.guide:
+      case Stage.finish:
+      case Stage.share:
+      case Stage.recover:
+      case Stage.records:
+      case Stage.overlay:
+        break; // 아직 할 일 없음
+    }
+  }
+
+  void _onEnter(Stage stage, {required Stage from}) {
+    switch (stage) {
+      case Stage.recover:
+        // 3-9: 어디서 왔는지 기억한다 → 진행 칸을 그 단계에 멈춘다.
+        _failedStage = from;
+      case Stage.share:
+        // 기능별_검토_결론 5장: 공유 단계에 들어올 때마다 "확인함"을 지운다 → P를 다시 거쳐야 보낼 수 있다.
+        _shareConfirmed = false;
+      case Stage.ready:
+      case Stage.waiting: // 세션 비우기·복사본 삭제는 _reset이 한다 (기다려야 하는 일)
+      case Stage.input:
+      case Stage.analyze:
+      case Stage.choose:
+      case Stage.guide:
+      case Stage.finish:
+      case Stage.records:
+      case Stage.overlay:
+        break; // 아직 할 일 없음
+    }
   }
 
   static ScreenId _stepScreen(int i) => const [

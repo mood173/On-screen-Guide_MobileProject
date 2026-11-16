@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'package:screen_guide/app/guide_flow.dart';
+import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/shared/cells/guide_scaffold.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/theme/app_tokens.dart';
 
-/// GA · 이미지 분석 중 (Figma 15:161)
+/// GA · 이미지 분석 중 (Figma 15:161) / CA · 사진 분석 중 (15:131). 위젯 하나 (시스템설계 3-0).
 ///
 /// 체크 3개는 연출이다. 채널은 결과를 한 번에 돌려주므로 단계별 진행 근거가 없다(설계 6.2 주의).
 /// 3초가 넘으면 오류로 끊지 않고 "조금 더 걸리고 있어요"를 보여 준다(계약 v1 결정 3).
@@ -34,12 +35,12 @@ class _AnalyzingScreenState extends State<AnalyzingScreen>
   Widget build(BuildContext context) {
     final flow = widget.flow;
     return GuideScaffold(
-      title: '이미지 분석 중',
+      title: flow.screen.title, // GA "이미지 분석 중" / CA "사진 분석 중"
       onBack: () => flow.dispatch(ActionId.navBack),
       body: [
-        const ScreenHeading(
+        ScreenHeading(
           '화면 속 길을\n찾고 있어요',
-          '갤러리 선택 · 기기 내부에서 처리 중',
+          '${flow.input == InputKind.camera ? '카메라 촬영' : '갤러리 선택'} · 기기 내부에서 처리 중',
           size: 28,
         ),
         Container(

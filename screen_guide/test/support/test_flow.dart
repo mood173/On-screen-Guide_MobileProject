@@ -23,6 +23,7 @@ GuideFlow testFlow({
   HistoryRepository? history,
   ImageFiles files = const AssetPathImageFiles(),
   GalleryInput? gallery,
+  CameraInput? camera,
   InputCleanup? cleanup,
   Duration slowAfter = const Duration(seconds: 3),
   DateTime Function()? now,
@@ -32,7 +33,7 @@ GuideFlow testFlow({
   history: history ?? InMemoryHistoryRepository(),
   galleryInput:
       gallery ?? FakeGalleryInput(files: files, loadThumbnail: noThumbnail),
-  cameraInput: FakeCameraInput(files: files),
+  cameraInput: camera ?? FakeCameraInput(files: files),
   inputCleanup: cleanup ?? FakeInputCleanup(files: files),
   sharer: FakeSharer(),
   mapUpdater: FakeMapUpdater(),

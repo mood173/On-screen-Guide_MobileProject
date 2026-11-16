@@ -17,6 +17,7 @@ abstract final class AppColors {
   static const textStatus = Color(0xFF171F33); // 상태 표시줄·툴바
   static const textSecondary = Color(0xFF7B8497); // 보조 설명, 비활성 탭
   static const textTertiary = Color(0xFF49536A); // 보조 버튼 글자
+  static const cardBody = Color(0xFF637087); // 흰 카드 안 설명 (Figma DENY·CP)
   static const chevron = Color(0xFFA4ACBA); // 목록 오른쪽 ›
 
   // 주 색 (인디고)
