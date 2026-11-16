@@ -1,4 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 사진 가져오기 (최정혁, 협업규격_최종 4.3 #2·#3 / 기능별_검토_결론 1-3)
+         CAMERA: 선언해야 카메라 권한 요청·거부 흐름(CP → DENY)이 생긴다.
+         READ_MEDIA_IMAGES: Android 13 이상에서 사진 목록 읽기.
+         READ_MEDIA_VISUAL_USER_SELECTED: Android 14 이상의 "일부 사진만 허용".
+         위치(ACCESS_MEDIA_LOCATION)·연락처·전체 저장소 권한은 선언하지 않는다. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+
     <application
         android:label="screen_guide"
         android:name="${applicationName}"
