@@ -132,6 +132,11 @@ class GuideFlow extends ChangeNotifier {
 
   /// 펼쳐 본 기록 한 건 (다시 보기). null이면 목록만 보인다.
   HistoryEntry? openedEntry;
+
+  /// 설정 화면(SETTINGS)에 보이는 기능 맵 revision (역할설계 D7). 설정 탭으로 들어올 때 읽는다.
+  /// 기록 ↔ 설정은 같은 기록 단계라 서로 오가도 _onExit(records)가 돌지 않는다 → 위 기록 값이 남지만,
+  /// 기록 탭으로 돌아오면 _openHistory가 새로 읽으니 화면에 낡은 값이 보이지 않는다.
+  String? mapRevision;
   int get totalSteps => action?.steps.length ?? 0;
   GuideStep? get currentStep => action?.steps[step];
 
@@ -195,7 +200,6 @@ class GuideFlow extends ChangeNotifier {
     ActionId.sharePrepare,
     ActionId.shareConfirm,
     ActionId.shareSend,
-    ActionId.navSettings,
     // 이번 제출에서 만들지 않는 것
     ActionId.syncToggle, // 동기화 동의 (일정_현실검토 3-2 [제안]: 설정 화면에서 뺌)
     ActionId.mapCheck, // Firebase 맵 갱신 (일정_현실검토 3-2: 지금 뺌)
@@ -260,11 +264,12 @@ class GuideFlow extends ChangeNotifier {
         if (arg is String) await _openEntry(arg);
       case ActionId.historyDelete:
         if (arg is String) await _deleteEntry(arg);
+      case ActionId.navSettings:
+        await _openSettings();
       // ── 아직 없는 기능: 하나씩 적는다 (목록은 [notReady]와 같아야 한다) ──
       case ActionId.sharePrepare:
       case ActionId.shareConfirm:
       case ActionId.shareSend:
-      case ActionId.navSettings:
       case ActionId.syncToggle:
       case ActionId.mapCheck:
       case ActionId.overlaySetup:
@@ -512,6 +517,16 @@ class GuideFlow extends ChangeNotifier {
     notice = '안내 기록에 저장했어요';
   }
 
+  // ───────────── 설정 (시스템설계 3-9, 일정_현실검토 3-2 [제안] "권한 상태와 맵 revision 두 줄") ─────────────
+
+  /// 하단 탭 "설정" → SETTINGS. 맵 revision을 읽어 둔다.
+  /// 권한 상태는 읽지 않는다: 묻지 않고 상태만 읽는 포트가 없다 (requestAccess는 허용 창을 띄운다).
+  /// 대신 화면이 "권한 관리" 줄로 기기 설정을 연다(settingsOpenPermission, 이미 있음). 11/22 결정 ㉮
+  Future<void> _openSettings() async {
+    mapRevision = await _guidance.activeRevision();
+    _go(ScreenId.settings, FlowState.idle);
+  }
+
   // ───────────── 기록 (시스템설계 3-9, 9장) ─────────────
 
   /// 하단 탭 "기록" → HISTORY. 목록을 읽어 두고 화면은 [historyItems]만 그린다 (협업규격 3.6).
@@ -645,6 +660,7 @@ class GuideFlow extends ChangeNotifier {
         // 기록 화면의 값은 그 화면에서만 쓴다. 떠날 때 비워서 다음에 들어오면 새로 읽는다.
         historyItems = const [];
         openedEntry = null;
+        mapRevision = null;
       case Stage.ready:
       case Stage.waiting:
       case Stage.input:

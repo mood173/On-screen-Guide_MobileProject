@@ -408,15 +408,77 @@ void main() {
     });
   });
 
+  // 시스템설계 3-9 SETTINGS, 일정_현실검토 3-2 [제안] "권한 상태와 맵 revision 두 줄" (협업규격 4.2 5번)
+  group('설정 화면 (SETTINGS)', () {
+    test('설정 탭 → SETTINGS, 기능 맵 revision을 읽어 둔다', () async {
+      final f = testFlow(guidance: _OneActionRepo()); // revision 't'
+      await f.dispatch(ActionId.navSettings);
+      expect(f.screen, ScreenId.settings);
+      expect(f.mapRevision, 't');
+    });
+
+    test('권한 관리 → 기기 설정을 열고 설정 화면에 머문다 (권한을 요청하지 않는다)', () async {
+      final cleanup = _RecordingCleanup();
+      final f = testFlow(cleanup: cleanup);
+      await f.dispatch(ActionId.navSettings);
+      await f.dispatch(ActionId.settingsOpenPermission);
+      expect(cleanup.settingsOpened, 1);
+      expect(f.screen, ScreenId.settings);
+    });
+
+    test('기록 ↔ 설정 탭을 오가도 기록은 새로 읽는다', () async {
+      final history = InMemoryHistoryRepository();
+      final f = testFlow(history: history);
+      await f.dispatch(ActionId.navSettings);
+      await f.dispatch(ActionId.navHistory);
+      expect(f.screen, ScreenId.history);
+      expect(f.historyItems, isEmpty);
+
+      await history.save(
+        HistoryEntry(
+          id: 'a',
+          actionId: 'chat.send',
+          actionTitle: '메시지 보내기',
+          stepInstructions: const ['보내기를 누르세요'],
+          input: InputKind.gallery,
+          createdAt: DateTime(2026, 11, 20),
+        ),
+      );
+      await f.dispatch(ActionId.navSettings);
+      await f.dispatch(ActionId.navHistory);
+      expect(f.historyItems.map((e) => e.id), ['a'], reason: '설정에 다녀오면 다시 읽음');
+    });
+
+    test('뒤로 → 홈, 떠나면 revision을 비운다', () async {
+      final f = _flow();
+      await f.dispatch(ActionId.navSettings);
+      await f.dispatch(ActionId.navBack);
+      expect(f.screen, ScreenId.h);
+      expect(f.mapRevision, isNull);
+    });
+
+    test('설정 화면에서 열리는 버튼: 권한 설정·동기화 + 하단 탭 + 뒤로 (3-9)', () async {
+      final f = _flow();
+      await f.dispatch(ActionId.navSettings);
+      expect(f.allowed, {
+        ActionId.settingsOpenPermission,
+        ActionId.syncToggle, // 표에는 있고 처리는 '준비 중' (일정_현실검토 3-2: 동기화 동의는 뺀다)
+        ActionId.navHome,
+        ActionId.navHistory,
+        ActionId.navSettings,
+        ActionId.navBack,
+      });
+    });
+  });
+
   // 협업규격 4.2 5번 "모든 버튼 ID에 핸들러".
   // 빠진 갈래는 컴파일러가 잡는다(handle의 switch에 default 없음). 시험은 '준비 중' 목록이 실제 처리와 같은지를 본다.
   group('버튼 등록부', () {
-    test('준비 중 목록은 정한 10개뿐 — 기능을 만들면 여기서도 지운다', () {
+    test('준비 중 목록은 정한 9개뿐 — 기능을 만들면 여기서도 지운다', () {
       expect(GuideFlow.notReady, {
         ActionId.sharePrepare,
         ActionId.shareConfirm,
         ActionId.shareSend,
-        ActionId.navSettings,
         ActionId.syncToggle,
         ActionId.mapCheck,
         ActionId.overlaySetup,
@@ -442,9 +504,8 @@ void main() {
 
     test('화면에서 준비 중 버튼을 누르면 화면은 그대로, 문구만 나온다', () async {
       final f = _flow();
-      await f.dispatch(
-        ActionId.navSettings,
-      ); // 홈 하단 탭 (관문을 거치는 실제 길, 설정은 5-3에서)
+      // 홈의 "화면 실시간 스캔" (관문을 거치는 실제 길, N01은 일정 제외)
+      await f.dispatch(ActionId.overlaySetup);
       expect(f.screen, ScreenId.h);
       expect(f.notice, GuideFlow.notReadyNotice);
     });
