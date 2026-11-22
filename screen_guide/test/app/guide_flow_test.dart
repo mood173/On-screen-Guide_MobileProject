@@ -315,6 +315,40 @@ void main() {
     expect(f.notice, isNotNull);
   });
 
+  // 협업규격 4.2 5번 "모든 버튼 ID에 핸들러".
+  // 빠진 갈래는 컴파일러가 잡는다(dispatch의 switch에 default 없음). 시험은 '준비 중' 목록이 맞는지를 본다.
+  group('버튼 등록부', () {
+    test('준비 중 목록은 정한 13개뿐 — 기능을 만들면 여기서도 지운다', () {
+      expect(GuideFlow.notReady, {
+        ActionId.sharePrepare,
+        ActionId.shareConfirm,
+        ActionId.shareSend,
+        ActionId.historyOpen,
+        ActionId.historyDelete,
+        ActionId.navHistory,
+        ActionId.navSettings,
+        ActionId.syncToggle,
+        ActionId.mapCheck,
+        ActionId.overlaySetup,
+        ActionId.overlayStart,
+        ActionId.overlayStop,
+        ActionId.overlayRescan,
+      });
+    });
+
+    test('홈(H)에서 누를 수 있는 버튼: 준비 중 목록에 있는 것만 "준비 중" 문구가 나온다', () async {
+      for (final id in testFlow().allowed) {
+        final f = testFlow(); // 버튼마다 새 흐름 (앞 버튼이 화면을 바꾸지 않게)
+        await f.dispatch(id);
+        expect(
+          f.notice == '이 기능은 아직 준비 중이에요',
+          GuideFlow.notReady.contains(id),
+          reason: '$id',
+        );
+      }
+    });
+  });
+
   test(
     '갤러리 권한 거부 → 권한 안내 화면 DENY(PERMISSION_DENIED), 다른 이미지를 고르면 앞 복사본을 지운다',
     () async {

@@ -172,7 +172,33 @@ class GuideFlow extends ChangeNotifier {
   /// 오류 화면끼리(E ↔ DENY)는 같은 복구 단계라 _onEnter가 돌지 않으므로 처음 실패한 단계가 남는다.
   Stage? _failedStage;
 
-  // ───────────── dispatch ─────────────
+  // ───────────── dispatch = 버튼 등록부 (협업규격 4.2 5번, 역할설계 U4 "switch 문") ─────────────
+  //
+  // 관문([allows])이 "지금 눌러도 되나"를 정하고, 이 switch가 "누르면 무엇을 하나"를 정한다.
+  // default를 두지 않는다: ActionId가 새로 생기고 갈래를 안 쓰면 컴파일 오류가 난다
+  // (일정_현실검토 3-2 — "모든 ID에 핸들러" 시험이 하던 일을 컴파일러가 한다).
+  // 아직 없는 기능도 숨기지 않고 하나씩 적어서 [_notReady]로 보낸다 (시스템설계 6-2 ActionRegistry 줄: "핸들러가 있거나 '준비 중'으로 명시").
+
+  /// 누르면 "준비 중" 문구만 나오는 버튼. 기능을 만들면 여기서 빼고 위 switch에 진짜 갈래를 쓴다.
+  /// 시험(guide_flow_test "버튼 등록부")이 이 목록과 실제 동작이 같은지 본다.
+  static const notReady = {
+    // 4.2 5번에서 채울 것
+    ActionId.sharePrepare,
+    ActionId.shareConfirm,
+    ActionId.shareSend,
+    ActionId.historyOpen,
+    ActionId.historyDelete,
+    ActionId.navHistory,
+    ActionId.navSettings,
+    // 이번 제출에서 만들지 않는 것
+    ActionId.syncToggle, // 동기화 동의 (일정_현실검토 3-2 [제안]: 설정 화면에서 뺌)
+    ActionId.mapCheck, // Firebase 맵 갱신 (일정_현실검토 3-2: 지금 뺌)
+    ActionId.overlaySetup, // N01 실시간 안내 (일정 제외)
+    ActionId.overlayStart,
+    ActionId.overlayStop,
+    ActionId.overlayRescan,
+  };
+
   Future<void> dispatch(ActionId id, [Object? arg]) async {
     if (!allows(id)) return;
     switch (id) {
@@ -210,11 +236,27 @@ class GuideFlow extends ChangeNotifier {
         await _reset();
       case ActionId.historySave:
         await _saveHistory();
-      default:
-        notice = '이 기능은 아직 준비 중이에요';
+      // ── 아직 없는 기능: 하나씩 적는다 (목록은 [notReady]와 같아야 한다) ──
+      case ActionId.sharePrepare:
+      case ActionId.shareConfirm:
+      case ActionId.shareSend:
+      case ActionId.historyOpen:
+      case ActionId.historyDelete:
+      case ActionId.navHistory:
+      case ActionId.navSettings:
+      case ActionId.syncToggle:
+      case ActionId.mapCheck:
+      case ActionId.overlaySetup:
+      case ActionId.overlayStart:
+      case ActionId.overlayStop:
+      case ActionId.overlayRescan:
+        _notReady();
     }
     notifyListeners();
   }
+
+  /// 아직 없는 기능: 화면은 그대로 두고 문구만 한 번 보여 준다.
+  void _notReady() => notice = '이 기능은 아직 준비 중이에요';
 
   void clearNotice() => notice = null;
 
