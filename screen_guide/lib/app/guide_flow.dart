@@ -100,7 +100,7 @@ class GuideFlow extends ChangeNotifier {
 
   /// 공유 전 확인(P)에서 "확인했어요"를 눌렀는가. 꺼져 있으면 `shareSend`를 잠근다.
   /// 화면이 바꿀 수 없게 비공개로 두고 읽기만 열어 둔다 (협업규격 3.6: 세션 값은 흐름이 가진다).
-  /// 공유 단계에 들어올 때 끄는 곳은 [_onEnter]. 켜는 곳(shareConfirm)은 공유 화면을 만들 때(협업규격 4.2 5번) 넣는다.
+  /// 끄는 곳: 공유 단계에 들어올 때 [_onEnter]. 켜는 곳: P의 "확인했어요" [_shareConfirm] 한 곳뿐.
   bool get shareConfirmed => _shareConfirmed;
   bool _shareConfirmed = false;
 

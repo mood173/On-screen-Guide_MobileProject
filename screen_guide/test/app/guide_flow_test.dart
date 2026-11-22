@@ -554,7 +554,10 @@ void main() {
       await f.dispatch(ActionId.shareConfirm);
       expect(f.screen, ScreenId.share);
       expect(f.shareConfirmed, isTrue);
-      expect(f.allows(ActionId.shareSend), isTrue);
+      expect(f.allowed, {
+        ActionId.shareSend,
+        ActionId.navBack,
+      }, reason: 'SHARE에서 열리는 버튼 (3-8)');
     });
 
     test('뒤로: SHARE → P(확인함 유지) → DONE, 떠나면 공유 내용을 지운다', () async {
