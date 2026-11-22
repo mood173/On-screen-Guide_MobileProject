@@ -123,6 +123,15 @@ class GuideFlow extends ChangeNotifier {
 
   /// 식별된 화면에서 고를 수 있는 기능 (GuidanceRepository.actionsFor 결과)
   List<GuideAction> availableActions = const [];
+
+  // ── 기록 화면(HISTORY)이 읽는 값. 안내 세션 값이 아니다 (시스템설계 9장 "세션 변화 —") ──
+  // 기록 단계를 떠날 때 _onExit(records)가 비운다.
+
+  /// 기록 목록 (최근 것부터). 탭으로 들어올 때와 지운 뒤에 다시 읽는다.
+  List<HistoryEntry> historyItems = const [];
+
+  /// 펼쳐 본 기록 한 건 (다시 보기). null이면 목록만 보인다.
+  HistoryEntry? openedEntry;
   int get totalSteps => action?.steps.length ?? 0;
   GuideStep? get currentStep => action?.steps[step];
 
@@ -186,9 +195,6 @@ class GuideFlow extends ChangeNotifier {
     ActionId.sharePrepare,
     ActionId.shareConfirm,
     ActionId.shareSend,
-    ActionId.historyOpen,
-    ActionId.historyDelete,
-    ActionId.navHistory,
     ActionId.navSettings,
     // 이번 제출에서 만들지 않는 것
     ActionId.syncToggle, // 동기화 동의 (일정_현실검토 3-2 [제안]: 설정 화면에서 뺌)
@@ -248,13 +254,16 @@ class GuideFlow extends ChangeNotifier {
         await _reset();
       case ActionId.historySave:
         await _saveHistory();
+      case ActionId.navHistory:
+        await _openHistory();
+      case ActionId.historyOpen:
+        if (arg is String) await _openEntry(arg);
+      case ActionId.historyDelete:
+        if (arg is String) await _deleteEntry(arg);
       // ── 아직 없는 기능: 하나씩 적는다 (목록은 [notReady]와 같아야 한다) ──
       case ActionId.sharePrepare:
       case ActionId.shareConfirm:
       case ActionId.shareSend:
-      case ActionId.historyOpen:
-      case ActionId.historyDelete:
-      case ActionId.navHistory:
       case ActionId.navSettings:
       case ActionId.syncToggle:
       case ActionId.mapCheck:
@@ -503,8 +512,33 @@ class GuideFlow extends ChangeNotifier {
     notice = '안내 기록에 저장했어요';
   }
 
-  /// HISTORY 화면이 읽는다.
-  Future<List<HistoryEntry>> historyList() => _history.list();
+  // ───────────── 기록 (시스템설계 3-9, 9장) ─────────────
+
+  /// 하단 탭 "기록" → HISTORY. 목록을 읽어 두고 화면은 [historyItems]만 그린다 (협업규격 3.6).
+  Future<void> _openHistory() async {
+    historyItems = await _history.list();
+    openedEntry = null;
+    _go(ScreenId.history, FlowState.idle);
+  }
+
+  /// 다시 보기: 한 건을 읽어 펼친다 (9장: `HistoryRepository.get` → 단계 문구 목록).
+  /// 그 사이 지워져 없으면 펼치지 않고 목록을 새로 읽는다.
+  Future<void> _openEntry(String id) async {
+    final e = await _history.get(id);
+    if (e == null) {
+      historyItems = await _history.list();
+      return;
+    }
+    openedEntry = e;
+  }
+
+  /// 지우기. "정말 지울까요?" 확인은 화면이 먼저 받는다 (3-9 규칙, 확인창은 화면 전용 상태 — 4-2 규칙 3).
+  /// 펼쳐 둔 기록을 지웠으면 펼침도 닫는다 (없는 기록이 화면에 남지 않게).
+  Future<void> _deleteEntry(String id) async {
+    await _history.delete(id);
+    if (openedEntry?.id == id) openedEntry = null;
+    historyItems = await _history.list();
+  }
 
   // ───────────── 복구·이동 ─────────────
   void _fail(ErrorCode code) {
@@ -546,6 +580,13 @@ class GuideFlow extends ChangeNotifier {
             _scene(gallery: ScreenId.rg, camera: ScreenId.rc),
             FlowState.identified,
           );
+        }
+      case ScreenId.history:
+        // 펼쳐 보는 중이면 목록으로, 목록이면 홈으로 (한 칸씩)
+        if (openedEntry != null) {
+          openedEntry = null;
+        } else {
+          await _reset();
         }
       default:
         await _reset();
@@ -600,6 +641,10 @@ class GuideFlow extends ChangeNotifier {
         _pendingId = null;
         _slowTimer?.cancel();
         slow = false;
+      case Stage.records:
+        // 기록 화면의 값은 그 화면에서만 쓴다. 떠날 때 비워서 다음에 들어오면 새로 읽는다.
+        historyItems = const [];
+        openedEntry = null;
       case Stage.ready:
       case Stage.waiting:
       case Stage.input:
@@ -608,7 +653,6 @@ class GuideFlow extends ChangeNotifier {
       case Stage.finish:
       case Stage.share:
       case Stage.recover:
-      case Stage.records:
       case Stage.overlay:
         break; // 아직 할 일 없음
     }

@@ -10,6 +10,7 @@ import 'package:screen_guide/features/guidance_map/data/demo_guidance.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
 import 'package:screen_guide/features/history/data/in_memory_history_repository.dart';
+import 'package:screen_guide/features/history/domain/history.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/contracts/analysis.dart';
 import 'package:screen_guide/shared/contracts/error_code.dart';
@@ -286,7 +287,7 @@ void main() {
     expect(f.screen, ScreenId.done);
 
     await f.dispatch(ActionId.historySave);
-    final saved = (await f.historyList()).single;
+    final saved = (await history.list()).single;
     expect(saved.actionId, 'chat.send');
     expect(saved.stepInstructions, hasLength(2));
     expect(saved.piiTypes, hasLength(5));
@@ -307,17 +308,114 @@ void main() {
     expect(f.availableActions.map((a) => a.actionId), ['settings.battery']);
   });
 
+  // 시스템설계 3-9 기록·설정, 9장 "기록을 다시 본다 / 지운다" (협업규격 4.2 5번)
+  group('기록 화면 (HISTORY)', () {
+    HistoryEntry entry(String id, int hour) => HistoryEntry(
+      id: id,
+      actionId: 'chat.send',
+      actionTitle: '메시지 보내기 $id',
+      stepInstructions: const ['입력창을 누르세요', '보내기를 누르세요'],
+      input: InputKind.gallery,
+      createdAt: DateTime(2026, 11, 20, hour),
+    );
+
+    Future<(GuideFlow, InMemoryHistoryRepository)> withTwo() async {
+      final history = InMemoryHistoryRepository();
+      await history.save(entry('a', 9));
+      await history.save(entry('b', 10));
+      return (testFlow(history: history), history);
+    }
+
+    test('기록이 0건: 탭을 누르면 HISTORY, 목록은 비어 있다', () async {
+      final f = _flow();
+      await f.dispatch(ActionId.navHistory);
+      expect(f.screen, ScreenId.history);
+      expect(f.historyItems, isEmpty);
+      expect(f.openedEntry, isNull);
+    });
+
+    test('여러 건: 최근 것부터 읽어 둔다', () async {
+      final (f, _) = await withTwo();
+      await f.dispatch(ActionId.navHistory);
+      expect(f.historyItems.map((e) => e.id), ['b', 'a']);
+    });
+
+    test('다시 보기: 한 건을 펼치면 단계 문구가 있다, 뒤로 → 목록 → 홈', () async {
+      final (f, _) = await withTwo();
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.historyOpen, 'a');
+      expect(f.openedEntry?.id, 'a');
+      expect(f.openedEntry?.stepInstructions, hasLength(2));
+
+      await f.dispatch(ActionId.navBack); // 펼침 닫기
+      expect(f.screen, ScreenId.history);
+      expect(f.openedEntry, isNull);
+
+      await f.dispatch(ActionId.navBack); // 목록 → 홈
+      expect(f.screen, ScreenId.h);
+    });
+
+    test('지우기: 저장소에서 지우고 목록을 다시 읽는다', () async {
+      final (f, history) = await withTwo();
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.historyDelete, 'b');
+      expect(f.historyItems.map((e) => e.id), ['a']);
+      expect(await history.get('b'), isNull);
+    });
+
+    test('펼쳐 둔 기록을 지우면 펼침이 닫힌다 / 다른 기록을 지우면 그대로', () async {
+      final (f, _) = await withTwo();
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.historyOpen, 'a');
+      await f.dispatch(ActionId.historyDelete, 'b');
+      expect(f.openedEntry?.id, 'a', reason: '다른 기록을 지움');
+      await f.dispatch(ActionId.historyDelete, 'a');
+      expect(f.openedEntry, isNull, reason: '펼쳐 둔 기록을 지움');
+      expect(f.historyItems, isEmpty);
+    });
+
+    test('이미 지워진 기록을 열면: 펼치지 않고 목록을 새로 읽는다', () async {
+      final (f, history) = await withTwo();
+      await f.dispatch(ActionId.navHistory);
+      await history.delete('a'); // 화면 목록에는 아직 a가 있다
+      await f.dispatch(ActionId.historyOpen, 'a');
+      expect(f.openedEntry, isNull);
+      expect(f.historyItems.map((e) => e.id), ['b']);
+    });
+
+    test('기록 화면을 떠나면 값을 비운다 (홈 탭)', () async {
+      final (f, _) = await withTwo();
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.historyOpen, 'a');
+      await f.dispatch(ActionId.navHome);
+      expect(f.screen, ScreenId.h);
+      expect(f.historyItems, isEmpty);
+      expect(f.openedEntry, isNull);
+    });
+
+    test('기록 화면에서 열리는 버튼: 열기·지우기·공유 + 하단 탭 + 뒤로 (3-9)', () async {
+      final f = _flow();
+      await f.dispatch(ActionId.navHistory);
+      expect(f.allowed, {
+        ActionId.historyOpen,
+        ActionId.historyDelete,
+        ActionId.sharePrepare,
+        ActionId.navHome,
+        ActionId.navHistory,
+        ActionId.navSettings,
+        ActionId.navBack,
+      });
+    });
+  });
+
   // 협업규격 4.2 5번 "모든 버튼 ID에 핸들러".
   // 빠진 갈래는 컴파일러가 잡는다(handle의 switch에 default 없음). 시험은 '준비 중' 목록이 실제 처리와 같은지를 본다.
   group('버튼 등록부', () {
-    test('준비 중 목록은 정한 13개뿐 — 기능을 만들면 여기서도 지운다', () {
+    test('준비 중 목록은 정한 10개뿐 — 기능을 만들면 여기서도 지운다', () {
       expect(GuideFlow.notReady, {
         ActionId.sharePrepare,
         ActionId.shareConfirm,
         ActionId.shareSend,
-        ActionId.historyOpen,
-        ActionId.historyDelete,
-        ActionId.navHistory,
         ActionId.navSettings,
         ActionId.syncToggle,
         ActionId.mapCheck,
@@ -344,7 +442,9 @@ void main() {
 
     test('화면에서 준비 중 버튼을 누르면 화면은 그대로, 문구만 나온다', () async {
       final f = _flow();
-      await f.dispatch(ActionId.navHistory); // 홈 하단 탭 (관문을 거치는 실제 길)
+      await f.dispatch(
+        ActionId.navSettings,
+      ); // 홈 하단 탭 (관문을 거치는 실제 길, 설정은 5-3에서)
       expect(f.screen, ScreenId.h);
       expect(f.notice, GuideFlow.notReadyNotice);
     });
