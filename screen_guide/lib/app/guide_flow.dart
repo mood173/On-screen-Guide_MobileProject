@@ -109,6 +109,12 @@ class GuideFlow extends ChangeNotifier {
   bool get capturing => _capturing;
   bool _capturing = false;
 
+  /// 기록·설정 값을 읽는 중 (목록·한 건·지우기·revision). 켜져 있으면 [allowed]가 모든 버튼을 잠근다.
+  /// 읽는 사이 다른 탭을 누르면, 늦게 끝난 읽기가 마지막에 누른 화면을 덮어쓰기 때문 (5-3a 점검에서 발견).
+  /// 켜고 끄는 곳: `_openHistory`·`_openEntry`·`_deleteEntry`·`_openSettings`의 try/finally.
+  bool get loadingRecords => _loadingRecords;
+  bool _loadingRecords = false;
+
   /// 권한이 거부된 입력 방식 (협업규격 3.4 "거부된 입력 방식을 세션에 기록", 3.6 세션 값).
   /// 권한 안내 화면(DENY)이 이 값을 보고 "설정 열기"와 "다른 방법으로 대신하기"를 고른다.
   InputKind? get deniedInput => _deniedInput;
@@ -137,6 +143,7 @@ class GuideFlow extends ChangeNotifier {
   /// 기록 ↔ 설정은 같은 기록 단계라 서로 오가도 _onExit(records)가 돌지 않는다 → 위 기록 값이 남지만,
   /// 기록 탭으로 돌아오면 _openHistory가 새로 읽으니 화면에 낡은 값이 보이지 않는다.
   String? mapRevision;
+
   int get totalSteps => action?.steps.length ?? 0;
   GuideStep? get currentStep => action?.steps[step];
 
@@ -156,6 +163,8 @@ class GuideFlow extends ChangeNotifier {
     // 사진을 가져오는 중에는 모든 버튼 잠금 (연타 차단, 11/14 점검에서 발견).
     // 카메라가 두 번 열리거나, 가져오는 사이 뒤로 가서 늦게 온 사진이 엉뚱한 화면을 띄우는 일을 막는다.
     if (_capturing) return {};
+    // 기록·설정 값을 읽는 중에도 같은 이유로 모두 잠금 (늦게 끝난 읽기가 화면을 덮어쓰지 않게)
+    if (_loadingRecords) return {};
     final s = {...StageTable.always, ...StageTable.allowedOn(screen)};
     // 대상을 찾는 중에는 단계 버튼 잠금 (3-6, 중복 실행 차단)
     if (locating) s.removeAll(_stepActions);
@@ -523,36 +532,56 @@ class GuideFlow extends ChangeNotifier {
   /// 권한 상태는 읽지 않는다: 묻지 않고 상태만 읽는 포트가 없다 (requestAccess는 허용 창을 띄운다).
   /// 대신 화면이 "권한 관리" 줄로 기기 설정을 연다(settingsOpenPermission, 이미 있음). 11/22 결정 ㉮
   Future<void> _openSettings() async {
-    mapRevision = await _guidance.activeRevision();
-    _go(ScreenId.settings, FlowState.idle);
+    _loadingRecords = true;
+    try {
+      mapRevision = await _guidance.activeRevision();
+      _go(ScreenId.settings, FlowState.idle);
+    } finally {
+      _loadingRecords = false;
+    }
   }
 
   // ───────────── 기록 (시스템설계 3-9, 9장) ─────────────
 
   /// 하단 탭 "기록" → HISTORY. 목록을 읽어 두고 화면은 [historyItems]만 그린다 (협업규격 3.6).
   Future<void> _openHistory() async {
-    historyItems = await _history.list();
-    openedEntry = null;
-    _go(ScreenId.history, FlowState.idle);
+    _loadingRecords = true;
+    try {
+      historyItems = await _history.list();
+      openedEntry = null;
+      _go(ScreenId.history, FlowState.idle);
+    } finally {
+      _loadingRecords = false;
+    }
   }
 
   /// 다시 보기: 한 건을 읽어 펼친다 (9장: `HistoryRepository.get` → 단계 문구 목록).
   /// 그 사이 지워져 없으면 펼치지 않고 목록을 새로 읽는다.
   Future<void> _openEntry(String id) async {
-    final e = await _history.get(id);
-    if (e == null) {
-      historyItems = await _history.list();
-      return;
+    _loadingRecords = true;
+    try {
+      final e = await _history.get(id);
+      if (e == null) {
+        historyItems = await _history.list();
+        return;
+      }
+      openedEntry = e;
+    } finally {
+      _loadingRecords = false;
     }
-    openedEntry = e;
   }
 
   /// 지우기. "정말 지울까요?" 확인은 화면이 먼저 받는다 (3-9 규칙, 확인창은 화면 전용 상태 — 4-2 규칙 3).
   /// 펼쳐 둔 기록을 지웠으면 펼침도 닫는다 (없는 기록이 화면에 남지 않게).
   Future<void> _deleteEntry(String id) async {
-    await _history.delete(id);
-    if (openedEntry?.id == id) openedEntry = null;
-    historyItems = await _history.list();
+    _loadingRecords = true;
+    try {
+      await _history.delete(id);
+      if (openedEntry?.id == id) openedEntry = null;
+      historyItems = await _history.list();
+    } finally {
+      _loadingRecords = false;
+    }
   }
 
   // ───────────── 복구·이동 ─────────────

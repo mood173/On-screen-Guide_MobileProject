@@ -471,6 +471,33 @@ void main() {
     });
   });
 
+  // 5-3a 점검: 저장소가 느릴 때 탭을 빠르게 두 번 누르면, 늦게 끝난 읽기가 마지막에 누른 화면을 덮어썼다.
+  // 읽는 동안 버튼을 잠가(loadingRecords) 두 번째 탭을 무시한다 (11/14 사진 가져오기 연타 차단과 같은 방식).
+  group('기록·설정 읽는 중 연타', () {
+    test('설정(느림)을 누르고 바로 기록을 누르면: 두 번째는 무시, 설정 화면', () async {
+      final f = testFlow(guidance: _SlowRevision());
+      final first = f.dispatch(ActionId.navSettings);
+      expect(f.loadingRecords, isTrue);
+      expect(f.allowed, isEmpty);
+      await f.dispatch(ActionId.navHistory); // 읽는 중이라 무시
+      await first;
+      expect(f.screen, ScreenId.settings);
+      expect(f.loadingRecords, isFalse);
+    });
+
+    test('기록(느림)을 누르고 바로 설정을 누르면: 두 번째는 무시, 기록 화면', () async {
+      final f = testFlow(history: _SlowHistory());
+      final first = f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.navSettings); // 읽는 중이라 무시
+      await first;
+      expect(f.screen, ScreenId.history);
+      // 화면만 보면 잠금이 없어도 기록으로 끝난다(설정이 먼저 끝나고 늦은 기록이 덮어씀).
+      // 그래서 "두 번째 탭이 아예 실행되지 않았다"를 revision으로 확인한다.
+      expect(f.mapRevision, isNull, reason: '설정 탭은 무시되어 revision을 읽지 않았다');
+      expect(f.allows(ActionId.navSettings), isTrue, reason: '다 읽으면 잠금이 풀린다');
+    });
+  });
+
   // 협업규격 4.2 5번 "모든 버튼 ID에 핸들러".
   // 빠진 갈래는 컴파일러가 잡는다(handle의 switch에 default 없음). 시험은 '준비 중' 목록이 실제 처리와 같은지를 본다.
   group('버튼 등록부', () {
@@ -828,4 +855,18 @@ class _RecordingCleanup implements InputCleanup {
   Future<void> openAppSettings() async => settingsOpened++;
   @override
   Future<void> release(PickedImage image) async {}
+}
+
+/// revision을 늦게 돌려주는 기능 맵 (연타 시험용)
+class _SlowRevision extends DemoGuidanceRepository {
+  @override
+  Future<String> activeRevision() =>
+      Future.delayed(const Duration(milliseconds: 50), () => 'slow');
+}
+
+/// 목록을 늦게 돌려주는 기록 저장소 (연타 시험용)
+class _SlowHistory extends InMemoryHistoryRepository {
+  @override
+  Future<List<HistoryEntry>> list() =>
+      Future.delayed(const Duration(milliseconds: 50), super.list);
 }
