@@ -129,4 +129,23 @@ void main() {
     final b = tester.widget<FilledButton>(find.byType(FilledButton));
     expect(b.onPressed, isNull);
   });
+
+  testWidgets('화면 읽기: 툴바 ‹ 는 "뒤로"로 읽히고 누르면 뒤로 동작', (tester) async {
+    _phoneSize(tester);
+    final semantics = tester.ensureSemantics();
+    var back = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PrivacyCheckScreen(
+          candidates: const [],
+          onConfirm: () {},
+          onBack: () => back++,
+        ),
+      ),
+    );
+    expect(find.bySemanticsLabel('뒤로'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('뒤로'));
+    expect(back, 1);
+    semantics.dispose();
+  });
 }
