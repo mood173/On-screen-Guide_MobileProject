@@ -10,6 +10,7 @@ import 'package:screen_guide/features/guide/ui/done_screen.dart';
 import 'package:screen_guide/features/guide/ui/error_screen.dart';
 import 'package:screen_guide/features/guide/ui/guide_step_screen.dart';
 import 'package:screen_guide/features/guide/ui/result_screen.dart';
+import 'package:screen_guide/features/history/ui/history_screen.dart';
 import 'package:screen_guide/features/settings/ui/deny_screen.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/contracts/screen_id.dart';
@@ -82,6 +83,7 @@ class _FlowShellState extends State<FlowShell> {
     ScreenId.done => DoneScreen(flow: flow),
     ScreenId.e => ErrorScreen(flow: flow),
     ScreenId.deny => DenyScreen(flow: flow),
+    ScreenId.history => HistoryScreen(flow: flow),
     _ => HomeScreen(flow: flow),
   };
 
