@@ -60,6 +60,18 @@ void main() {
     expect(find.textContaining('아직 저장한 안내가 없어요'), findsNothing);
   });
 
+  testWidgets('화면 읽기: 지우기 버튼은 어느 기록인지 함께 읽힌다', (tester) async {
+    await _openHistory(
+      tester,
+      saved: [
+        _entry('a', '메시지 보내기', InputKind.gallery),
+        _entry('b', '알림 설정 바꾸기', InputKind.camera),
+      ],
+    );
+    expect(find.bySemanticsLabel('메시지 보내기 기록 지우기'), findsOneWidget);
+    expect(find.bySemanticsLabel('알림 설정 바꾸기 기록 지우기'), findsOneWidget);
+  });
+
   testWidgets('카드를 누르면 단계 문구가 펼쳐지고, 뒤로 키를 누르면 접힌다', (tester) async {
     await _openHistory(
       tester,

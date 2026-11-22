@@ -159,7 +159,11 @@ class _EntryCard extends StatelessWidget {
                       style: _smallButton,
                       key: ValueKey('delete-${entry.id}'),
                       onPressed: onDelete,
-                      child: const Text('지우기'),
+                      // 화면 읽기(TalkBack)는 "지우기"만으로는 어느 기록인지 모른다 → 소리로는 기록 이름까지 읽게
+                      child: Text(
+                        '지우기',
+                        semanticsLabel: '${entry.actionTitle} 기록 지우기',
+                      ),
                     ),
                   ],
                 ),
