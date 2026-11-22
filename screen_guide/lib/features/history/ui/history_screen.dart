@@ -11,7 +11,7 @@ import 'package:screen_guide/shared/theme/app_tokens.dart';
 ///
 /// 모양은 Figma, 기능은 문서 (11/22 결정, docs/figma.md 4번):
 /// 앱 셸 하단 탭, 줄마다 지우기 + 한 번 확인, 기록 줄 = 기능 제목 / 입력 방식 · 시각.
-/// 화면은 흐름의 값(`historyItems`, `openedEntry`)만 그린다. 공유 버튼은 4.2 5번 5-4에서.
+/// 화면은 흐름의 값(`historyItems`, `openedEntry`)만 그린다. 공유는 펼친 카드 안의 "이 안내 공유하기"(sharePrepare는 펼친 기록을 보낸다).
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key, required this.flow});
   final GuideFlow flow;
@@ -52,6 +52,7 @@ class HistoryScreen extends StatelessWidget {
                         onDelete: flow.allows(ActionId.historyDelete)
                             ? () => _confirmDelete(context, e.id)
                             : null,
+                        onShare: _on(flow, ActionId.sharePrepare),
                       ),
                       const SizedBox(height: AppSpace.section),
                     ],
@@ -109,12 +110,16 @@ class _EntryCard extends StatelessWidget {
     required this.opened,
     required this.onOpen,
     required this.onDelete,
+    required this.onShare,
   });
 
   final HistoryEntry entry;
   final bool opened;
   final VoidCallback? onOpen;
   final VoidCallback? onDelete;
+
+  /// 펼쳤을 때만 보이는 "이 안내 공유하기" (sharePrepare)
+  final VoidCallback? onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -180,6 +185,12 @@ class _EntryCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                const SizedBox(height: 8),
+                TextButton(
+                  key: ValueKey('share-${entry.id}'),
+                  onPressed: onShare,
+                  child: const Text('이 안내 공유하기'),
+                ),
               ],
             ],
           ),

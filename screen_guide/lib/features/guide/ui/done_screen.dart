@@ -68,6 +68,13 @@ class DoneScreen extends StatelessWidget {
               ? () => flow.dispatch(ActionId.historySave)
               : null,
         ),
+        // 3-7 마무리 허용 버튼 sharePrepare. Figma DONE에는 없어 문서대로 더함 (docs/figma.md 7번)
+        SecondaryAction(
+          '공유하기',
+          onPressed: flow.allows(ActionId.sharePrepare)
+              ? () => flow.dispatch(ActionId.sharePrepare)
+              : null,
+        ),
         SecondaryAction(
           '새로운 화면 안내받기',
           onPressed: flow.allows(ActionId.navHome)
