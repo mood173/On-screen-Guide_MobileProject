@@ -4,7 +4,7 @@
 /// 분석 결과(화면에서 읽은 글자·개인정보 후보)는 받지 않으므로 공유 글에 섞일 길이 없다.
 ///
 /// SHARE 화면의 미리보기와 실제로 보내는 글이 같은 이 함수를 쓴다 → 보이는 것과 보내는 것이 같다.
-/// 구현이 하나뿐인 순수 계산이라 인터페이스 없이 함수로 둔다 (협업규격 2장 규칙 4, coordinate_mapper와 같은 자리).
+/// 구현이 하나뿐인 순수 계산이라 인터페이스 없이 함수로 둔다 (협업규격 3장 공통 규칙 4, coordinate_mapper와 같은 자리).
 String buildShareText({required String title, required List<String> steps}) {
   final lines = <String>[
     '$title · 사용 방법',
