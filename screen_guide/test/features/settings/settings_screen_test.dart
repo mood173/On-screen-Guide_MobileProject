@@ -1,6 +1,8 @@
 // SETTINGS 화면 (협업규격 4.2 5번, 시스템설계 3-9). 흐름 규칙은 guide_flow_test "설정 화면"이 보고,
 // 여기서는 화면이 값을 그리고 버튼을 보내는지만 본다. 장식 문구(제목·부제)는 찾지 않는다.
 
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -90,5 +92,21 @@ void main() {
     await _openSettings(tester);
     expect(find.textContaining('동기화'), findsNothing);
     expect(find.textContaining('동의'), findsNothing);
+  });
+
+  testWidgets('화면 읽기: 하단 탭은 기호 없이 "OO 탭"으로, 지금 탭은 선택됨으로 읽힌다', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _openSettings(tester);
+    bool selected(String label) =>
+        tester
+            .getSemantics(find.bySemanticsLabel(label))
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected ==
+        Tristate.isTrue;
+    expect(selected('설정 탭'), isTrue);
+    expect(selected('홈 탭'), isFalse);
+    expect(selected('기록 탭'), isFalse);
+    semantics.dispose();
   });
 }

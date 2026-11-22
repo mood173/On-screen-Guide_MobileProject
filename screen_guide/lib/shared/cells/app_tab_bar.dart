@@ -26,20 +26,26 @@ class AppTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget item(AppTab tab, String label, VoidCallback? onTap) {
+    // [label]은 화면 글자(Figma 그대로 기호 포함), [spoken]은 화면 읽기(TalkBack)가 읽는 이름.
+    // 기호(⌂ ◷ ⚙)를 소리로 읽지 않게 하고, 지금 탭은 "선택됨"으로 알린다 (5-3b 점검).
+    Widget item(AppTab tab, String label, String spoken, VoidCallback? onTap) {
       final on = tab == active;
       return Expanded(
-        child: InkWell(
-          key: ValueKey('tab-${tab.name}'),
-          // 지금 탭을 다시 눌러도 할 일이 없으니 막는다
-          onTap: on ? null : onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Center(
-            child: Text(
-              label,
-              style: AppText.tab.copyWith(
-                color: on ? AppColors.primary : AppColors.textSecondary,
-                fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+        child: Semantics(
+          selected: on,
+          child: InkWell(
+            key: ValueKey('tab-${tab.name}'),
+            // 지금 탭을 다시 눌러도 할 일이 없으니 막는다
+            onTap: on ? null : onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Center(
+              child: Text(
+                label,
+                semanticsLabel: spoken,
+                style: AppText.tab.copyWith(
+                  color: on ? AppColors.primary : AppColors.textSecondary,
+                  fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+                ),
               ),
             ),
           ),
@@ -56,9 +62,9 @@ class AppTabBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          item(AppTab.home, '⌂  홈', onHome),
-          item(AppTab.history, '◷  기록', onHistory),
-          item(AppTab.settings, '⚙  설정', onSettings),
+          item(AppTab.home, '⌂  홈', '홈 탭', onHome),
+          item(AppTab.history, '◷  기록', '기록 탭', onHistory),
+          item(AppTab.settings, '⚙  설정', '설정 탭', onSettings),
         ],
       ),
     );

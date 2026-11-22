@@ -81,6 +81,7 @@ class _MapVersionCard extends StatelessWidget {
   /// 기능 맵을 못 읽었을 때 구현이 돌려주는 값.
   /// 화면은 data/를 import할 수 없어(팀 의존 규칙) 글자를 직접 쓴다.
   /// 원본은 최정혁의 AssetGuidanceRepository.unavailableRevision — 값이 바뀌면 settings_screen_test가 실패한다.
+  /// 이 값 말고도 빈 값·null(아직 못 읽음)이면 "확인할 수 없어요"를 보여 준다 (버전 글자가 비어 보이지 않게).
   static const _unavailable = 'unavailable';
 
   @override
