@@ -104,6 +104,10 @@ class GuideFlow extends ChangeNotifier {
   bool get shareConfirmed => _shareConfirmed;
   bool _shareConfirmed = false;
 
+  /// 공유할 내용 (P·SHARE가 읽는다). `sharePrepare`를 누를 때 만들고, 공유 단계를 떠날 때 _onExit(share)가 지운다.
+  /// P는 이 안의 [ShareDraft.candidates]만 읽는다 (검토 결론 5장: 확인 화면이 받는 값은 유형과 가린 값의 목록만).
+  ShareDraft? shareDraft;
+
   /// 사진을 가져오는 중 (갤러리 권한·목록·사용, 카메라 촬영). 켜져 있으면 [allowed]가 모든 버튼을 잠근다.
   /// 켜고 끄는 곳: `_openGallery`·`_confirm`·`_takePhoto`의 try/finally (어느 길로 끝나도 꺼진다).
   bool get capturing => _capturing;
@@ -206,8 +210,6 @@ class GuideFlow extends ChangeNotifier {
   /// 시험(guide_flow_test "버튼 등록부")이 28개 모두를 [handle]로 눌러 이 목록과 실제 동작이 같은지 본다.
   static const notReady = {
     // 4.2 5번에서 채울 것
-    ActionId.sharePrepare,
-    ActionId.shareConfirm,
     ActionId.shareSend,
     // 이번 제출에서 만들지 않는 것
     ActionId.syncToggle, // 동기화 동의 (일정_현실검토 3-2 [제안]: 설정 화면에서 뺌)
@@ -275,9 +277,11 @@ class GuideFlow extends ChangeNotifier {
         if (arg is String) await _deleteEntry(arg);
       case ActionId.navSettings:
         await _openSettings();
-      // ── 아직 없는 기능: 하나씩 적는다 (목록은 [notReady]와 같아야 한다) ──
       case ActionId.sharePrepare:
+        _sharePrepare();
       case ActionId.shareConfirm:
+        _shareConfirm();
+      // ── 아직 없는 기능: 하나씩 적는다 (목록은 [notReady]와 같아야 한다) ──
       case ActionId.shareSend:
       case ActionId.syncToggle:
       case ActionId.mapCheck:
@@ -526,6 +530,69 @@ class GuideFlow extends ChangeNotifier {
     notice = '안내 기록에 저장했어요';
   }
 
+  // ───────────── 공유 (시스템설계 3-8, 검토 결론 5장) ─────────────
+
+  /// "공유하기" → P. 들어오는 곳은 마무리(DONE)와 기록(HISTORY) 두 곳 (3-8).
+  /// 공유 단계로 넘어가면 기록 값이 비워지므로(_onExit(records)) **화면을 바꾸기 전에** 묶음을 먼저 만든다.
+  void _sharePrepare() {
+    final ShareDraft? d;
+    switch (screen) {
+      case ScreenId.done:
+        // 마무리: 이번 세션의 기능과 첫 분석의 후보 (유형 + 가린 값)
+        final a = action;
+        d = a == null
+            ? null
+            : ShareDraft(
+                title: a.title,
+                steps: [for (final s in a.steps) s.instruction],
+                candidates: [
+                  for (final p in result?.pii ?? const <PiiCandidate>[])
+                    ShareCandidate(type: p.type, masked: p.masked),
+                ],
+                from: ScreenId.done,
+              );
+      case ScreenId.history:
+        // 기록: 펼쳐 둔 기록. 가린 값은 저장하지 않으므로 유형 이름만 (검토 결론 5장, 필수)
+        final e = openedEntry;
+        d = e == null
+            ? null
+            : ShareDraft(
+                title: e.actionTitle,
+                steps: e.stepInstructions,
+                candidates: [
+                  for (final t in e.piiTypes) ShareCandidate(type: t),
+                ],
+                from: ScreenId.history,
+                historyId: e.id,
+              );
+      default:
+        d = null; // 단계 설정표상 다른 화면에서는 열리지 않는다
+    }
+    if (d == null) return; // 공유할 내용이 없다 (기록을 펼치지 않음 등)
+    shareDraft = d;
+    _go(ScreenId.p, state); // 공유 단계에 들어갈 때 _onEnter(share)가 "확인함"을 지운다
+  }
+
+  /// P의 "확인했어요" → SHARE. 여기서만 "확인함"을 켠다 → shareSend가 열린다 (관문, 검토 결론 5장 필수).
+  void _shareConfirm() {
+    if (shareDraft == null) return;
+    _shareConfirmed = true;
+    _go(ScreenId.share, state);
+  }
+
+  /// 공유를 떠나 들어온 곳으로 (3-8 "뒤로 = 들어온 단계").
+  /// 기록에서 왔으면 기록을 다시 읽고 그 기록을 펼친 채로 돌려놓는다 (떠날 때 기록 값이 비워졌으므로).
+  Future<void> _leaveShare() async {
+    final d = shareDraft;
+    if (d == null || d.from == ScreenId.done) {
+      _go(ScreenId.done, FlowState.done);
+      return;
+    }
+    await _openHistory();
+    final id = d.historyId;
+    if (id != null) await _openEntry(id);
+  }
+
   // ───────────── 설정 (시스템설계 3-9, 일정_현실검토 3-2 [제안] "권한 상태와 맵 revision 두 줄") ─────────────
 
   /// 하단 탭 "설정" → SETTINGS. 맵 revision을 읽어 둔다.
@@ -625,6 +692,12 @@ class GuideFlow extends ChangeNotifier {
             FlowState.identified,
           );
         }
+      case ScreenId.share:
+        // SHARE → P 한 칸 (11/22 결정 ㉮. 3-8은 "뒤로 = 들어온 단계"지만 11/14 결정 ⑤ "장면마다 한 칸씩"을 따름).
+        // 같은 공유 단계 안이라 "확인함"은 남는다.
+        _go(ScreenId.p, state);
+      case ScreenId.p:
+        await _leaveShare(); // P → 들어온 곳 (3-8)
       case ScreenId.history:
         // 펼쳐 보는 중이면 목록으로, 목록이면 홈으로 (한 칸씩)
         if (openedEntry != null) {
@@ -685,6 +758,9 @@ class GuideFlow extends ChangeNotifier {
         _pendingId = null;
         _slowTimer?.cancel();
         slow = false;
+      case Stage.share:
+        // 공유할 내용은 공유 단계에서만 쓴다 (가린 값이 흐름 메모리에 오래 남지 않게)
+        shareDraft = null;
       case Stage.records:
         // 기록 화면의 값은 그 화면에서만 쓴다. 떠날 때 비워서 다음에 들어오면 새로 읽는다.
         historyItems = const [];
@@ -696,7 +772,6 @@ class GuideFlow extends ChangeNotifier {
       case Stage.choose:
       case Stage.guide:
       case Stage.finish:
-      case Stage.share:
       case Stage.recover:
       case Stage.overlay:
         break; // 아직 할 일 없음
@@ -737,4 +812,38 @@ class GuideFlow extends ChangeNotifier {
     _slowTimer?.cancel();
     super.dispose();
   }
+}
+
+/// 공유할 내용 한 묶음 (11/22 결정 ①). P는 [candidates]만, SHARE(5-5)는 [title]·[steps]로 보낼 글을 만든다.
+/// 이미지·화면에서 읽은 글자는 담지 않는다 — 단계 문구는 기능 맵에 사람이 써 둔 글이다 (검토 결론 5장).
+class ShareDraft {
+  const ShareDraft({
+    required this.title,
+    required this.steps,
+    required this.candidates,
+    required this.from,
+    this.historyId,
+  });
+
+  /// 기능 제목
+  final String title;
+
+  /// 단계 문구
+  final List<String> steps;
+
+  /// 개인정보 후보 (P가 보여 준다)
+  final List<ShareCandidate> candidates;
+
+  /// 들어온 곳: [ScreenId.done] 또는 [ScreenId.history]. 뒤로 갈 곳.
+  final ScreenId from;
+
+  /// 기록에서 왔을 때 그 기록 id (돌아가서 다시 펼치려고)
+  final String? historyId;
+}
+
+/// P에 보이는 개인정보 후보 한 줄. 기록에서 왔으면 가린 값이 없다(null).
+class ShareCandidate {
+  const ShareCandidate({required this.type, this.masked});
+  final String type;
+  final String? masked;
 }

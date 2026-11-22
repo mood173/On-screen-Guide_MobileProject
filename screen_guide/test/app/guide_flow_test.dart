@@ -471,6 +471,132 @@ void main() {
     });
   });
 
+  // 시스템설계 3-8 공유, 검토 결론 5장 (협업규격 4.2 5번). SHARE 화면·보내기는 5-5.
+  group('공유 전 확인 (P)', () {
+    /// chat 샘플로 안내를 끝까지 → DONE (후보 5건)
+    Future<GuideFlow> toDone() async {
+      final f = _flow();
+      await _pickSample(f, SampleImage.chat);
+      await f.dispatch(ActionId.analyzeRun);
+      await f.dispatch(ActionId.guideStart, f.availableActions.single);
+      await f.dispatch(ActionId.guideNext);
+      await f.dispatch(ActionId.guideNext);
+      expect(f.screen, ScreenId.done);
+      return f;
+    }
+
+    Future<GuideFlow> toOpenedHistory({List<String> pii = const []}) async {
+      final history = InMemoryHistoryRepository();
+      await history.save(
+        HistoryEntry(
+          id: 'a',
+          actionId: 'chat.send',
+          actionTitle: '메시지 보내기',
+          stepInstructions: const ['입력창을 누르세요', '보내기를 누르세요'],
+          input: InputKind.gallery,
+          createdAt: DateTime(2026, 11, 20),
+          piiTypes: pii,
+        ),
+      );
+      final f = testFlow(history: history);
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.historyOpen, 'a');
+      return f;
+    }
+
+    test('DONE에서 공유하기 → P, 후보는 유형 + 가린 값', () async {
+      final f = await toDone();
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.screen, ScreenId.p);
+      final d = f.shareDraft!;
+      expect(d.from, ScreenId.done);
+      expect(d.steps, hasLength(2));
+      expect(d.candidates, hasLength(5));
+      expect(
+        d.candidates.every((c) => c.masked != null),
+        isTrue,
+        reason: '세션에서 왔으니 가린 값이 있다',
+      );
+    });
+
+    test('기록에서 공유하기 → P, 후보는 유형 이름만 (가린 값 없음, 필수)', () async {
+      final f = await toOpenedHistory(pii: ['휴대전화', '이메일']);
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.screen, ScreenId.p);
+      final d = f.shareDraft!;
+      expect(d.from, ScreenId.history);
+      expect(d.title, '메시지 보내기');
+      expect(d.candidates.map((c) => c.type), ['휴대전화', '이메일']);
+      expect(d.candidates.every((c) => c.masked == null), isTrue);
+    });
+
+    test('후보가 0건이어도 P를 거친다 (3-8 관문)', () async {
+      final f = await toOpenedHistory();
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.screen, ScreenId.p);
+      expect(f.shareDraft!.candidates, isEmpty);
+    });
+
+    test('기록을 펼치지 않고 공유하기가 오면 아무것도 하지 않는다', () async {
+      final f = _flow();
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.screen, ScreenId.history);
+      expect(f.shareDraft, isNull);
+    });
+
+    test('P에서는 보내기가 잠겨 있고, 확인했어요 → SHARE에서 열린다', () async {
+      final f = await toDone();
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.allowed, {ActionId.shareConfirm, ActionId.navBack});
+      expect(f.shareConfirmed, isFalse);
+
+      await f.dispatch(ActionId.shareConfirm);
+      expect(f.screen, ScreenId.share);
+      expect(f.shareConfirmed, isTrue);
+      expect(f.allows(ActionId.shareSend), isTrue);
+    });
+
+    test('뒤로: SHARE → P(확인함 유지) → DONE, 떠나면 공유 내용을 지운다', () async {
+      final f = await toDone();
+      await f.dispatch(ActionId.sharePrepare);
+      await f.dispatch(ActionId.shareConfirm);
+
+      await f.dispatch(ActionId.navBack);
+      expect(f.screen, ScreenId.p, reason: 'SHARE → P 한 칸 (결정 ㉮)');
+      expect(f.shareConfirmed, isTrue, reason: '같은 공유 단계 안');
+
+      await f.dispatch(ActionId.navBack);
+      expect(f.screen, ScreenId.done);
+      expect(f.shareDraft, isNull);
+      expect(f.action, isNotNull, reason: '세션은 그대로 (마무리로 돌아옴)');
+    });
+
+    test('기록에서 왔으면 P에서 뒤로 → 기록을 다시 읽고 그 기록을 펼친 채로', () async {
+      final f = await toOpenedHistory();
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.historyItems, isEmpty, reason: '공유 단계로 넘어가며 기록 값이 비워짐');
+
+      await f.dispatch(ActionId.navBack);
+      expect(f.screen, ScreenId.history);
+      expect(f.historyItems.map((e) => e.id), ['a']);
+      expect(f.openedEntry?.id, 'a');
+    });
+
+    test('다시 공유하기를 누르면 "확인함"이 지워져 P를 다시 거친다', () async {
+      final f = await toDone();
+      await f.dispatch(ActionId.sharePrepare);
+      await f.dispatch(ActionId.shareConfirm);
+      await f.dispatch(ActionId.navBack); // → P
+      await f.dispatch(ActionId.navBack); // → DONE
+
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.screen, ScreenId.p);
+      expect(f.shareConfirmed, isFalse);
+      expect(f.allows(ActionId.shareSend), isFalse);
+    });
+  });
+
   // 5-3a 점검: 저장소가 느릴 때 탭을 빠르게 두 번 누르면, 늦게 끝난 읽기가 마지막에 누른 화면을 덮어썼다.
   // 읽는 동안 버튼을 잠가(loadingRecords) 두 번째 탭을 무시한다 (11/14 사진 가져오기 연타 차단과 같은 방식).
   group('기록·설정 읽는 중 연타', () {
@@ -501,10 +627,8 @@ void main() {
   // 협업규격 4.2 5번 "모든 버튼 ID에 핸들러".
   // 빠진 갈래는 컴파일러가 잡는다(handle의 switch에 default 없음). 시험은 '준비 중' 목록이 실제 처리와 같은지를 본다.
   group('버튼 등록부', () {
-    test('준비 중 목록은 정한 9개뿐 — 기능을 만들면 여기서도 지운다', () {
+    test('준비 중 목록은 정한 7개뿐 — 기능을 만들면 여기서도 지운다', () {
       expect(GuideFlow.notReady, {
-        ActionId.sharePrepare,
-        ActionId.shareConfirm,
         ActionId.shareSend,
         ActionId.syncToggle,
         ActionId.mapCheck,
