@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:screen_guide/app/guide_flow.dart';
@@ -11,11 +13,14 @@ import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
 import 'package:screen_guide/features/history/data/in_memory_history_repository.dart';
 import 'package:screen_guide/features/history/domain/history.dart';
+import 'package:screen_guide/features/share/data/fake_sharer.dart';
+import 'package:screen_guide/features/share/domain/sharer.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/contracts/analysis.dart';
 import 'package:screen_guide/shared/contracts/error_code.dart';
 import 'package:screen_guide/shared/contracts/flow_state.dart';
 import 'package:screen_guide/shared/contracts/screen_id.dart';
+import 'package:screen_guide/shared/share_text.dart';
 
 import '../support/test_flow.dart';
 
@@ -600,6 +605,111 @@ void main() {
     });
   });
 
+  // 시스템설계 3-8 SHARE 결과, 검토 결론 5장 (협업규격 4.2 5번). 화면은 5-5c.
+  group('보내기 (SHARE)', () {
+    /// chat 샘플로 안내 끝 → 공유하기 → 확인했어요 → SHARE
+    Future<GuideFlow> toShare(Sharer sharer) async {
+      final f = testFlow(sharer: sharer);
+      await _pickSample(f, SampleImage.chat);
+      await f.dispatch(ActionId.analyzeRun);
+      await f.dispatch(ActionId.guideStart, f.availableActions.single);
+      await f.dispatch(ActionId.guideNext);
+      await f.dispatch(ActionId.guideNext);
+      await f.dispatch(ActionId.sharePrepare);
+      await f.dispatch(ActionId.shareConfirm);
+      expect(f.screen, ScreenId.share);
+      return f;
+    }
+
+    test('보냄: 미리보기 글 그대로 보내고 "공유했어요", 마무리로 돌아간다', () async {
+      final sharer = FakeSharer();
+      final f = await toShare(sharer);
+      final preview = f.shareText!;
+      expect(
+        preview,
+        buildShareText(
+          title: f.action!.title,
+          steps: [for (final s in f.action!.steps) s.instruction],
+        ),
+      );
+
+      await f.dispatch(ActionId.shareSend);
+      expect(sharer.sent, [preview], reason: '보이는 글 = 보내는 글');
+      expect(f.notice, '공유했어요');
+      expect(f.screen, ScreenId.done);
+      expect(f.shareDraft, isNull);
+      expect(f.shareText, isNull);
+    });
+
+    test('보낸 글에 가린 값이 없다 (세션에 후보 5건이 있어도)', () async {
+      final sharer = FakeSharer();
+      final f = await toShare(sharer);
+      final masked = [for (final p in f.result!.pii) p.masked];
+      expect(masked, hasLength(5));
+      await f.dispatch(ActionId.shareSend);
+      for (final m in masked) {
+        expect(sharer.sent.single, isNot(contains(m)));
+      }
+    });
+
+    test('닫음: 문구 없이 마무리로', () async {
+      final f = await toShare(FakeSharer(outcome: ShareOutcome.dismissed));
+      await f.dispatch(ActionId.shareSend);
+      expect(f.notice, isNull);
+      expect(f.screen, ScreenId.done);
+    });
+
+    test('실패: 안내 문구 후 마무리로 (3-8)', () async {
+      final f = await toShare(FakeSharer(outcome: ShareOutcome.failed));
+      await f.dispatch(ActionId.shareSend);
+      expect(f.notice, '공유하지 못했어요. 다시 시도해 주세요');
+      expect(f.screen, ScreenId.done);
+    });
+
+    test('기록에서 왔으면 보낸 뒤 기록으로 (그 기록을 펼친 채로)', () async {
+      final history = InMemoryHistoryRepository();
+      await history.save(
+        HistoryEntry(
+          id: 'a',
+          actionId: 'chat.send',
+          actionTitle: '메시지 보내기',
+          stepInstructions: const ['보내기를 누르세요'],
+          input: InputKind.gallery,
+          createdAt: DateTime(2026, 11, 20),
+        ),
+      );
+      final sharer = FakeSharer();
+      final f = testFlow(history: history, sharer: sharer);
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.historyOpen, 'a');
+      await f.dispatch(ActionId.sharePrepare);
+      await f.dispatch(ActionId.shareConfirm);
+      await f.dispatch(ActionId.shareSend);
+
+      expect(
+        sharer.sent.single,
+        buildShareText(title: '메시지 보내기', steps: const ['보내기를 누르세요']),
+      );
+      expect(f.screen, ScreenId.history);
+      expect(f.openedEntry?.id, 'a');
+    });
+
+    test('공유 시트가 떠 있는 동안 모든 버튼 잠금, 두 번 눌러도 한 번만 보낸다', () async {
+      final sharer = _HoldSharer();
+      final f = await toShare(sharer);
+      final first = f.dispatch(ActionId.shareSend);
+      expect(f.sharing, isTrue);
+      expect(f.allowed, isEmpty);
+      await f.dispatch(ActionId.shareSend); // 잠금이라 무시
+      expect(sharer.calls, 1);
+
+      sharer.finish(ShareOutcome.sent);
+      await first;
+      expect(f.sharing, isFalse);
+      expect(f.screen, ScreenId.done);
+    });
+  });
+
   // 5-3a 점검: 저장소가 느릴 때 탭을 빠르게 두 번 누르면, 늦게 끝난 읽기가 마지막에 누른 화면을 덮어썼다.
   // 읽는 동안 버튼을 잠가(loadingRecords) 두 번째 탭을 무시한다 (11/14 사진 가져오기 연타 차단과 같은 방식).
   group('기록·설정 읽는 중 연타', () {
@@ -630,9 +740,8 @@ void main() {
   // 협업규격 4.2 5번 "모든 버튼 ID에 핸들러".
   // 빠진 갈래는 컴파일러가 잡는다(handle의 switch에 default 없음). 시험은 '준비 중' 목록이 실제 처리와 같은지를 본다.
   group('버튼 등록부', () {
-    test('준비 중 목록은 정한 7개뿐 — 기능을 만들면 여기서도 지운다', () {
+    test('준비 중 목록은 정한 6개뿐 — 기능을 만들면 여기서도 지운다', () {
       expect(GuideFlow.notReady, {
-        ActionId.shareSend,
         ActionId.syncToggle,
         ActionId.mapCheck,
         ActionId.overlaySetup,
@@ -996,4 +1105,20 @@ class _SlowHistory extends InMemoryHistoryRepository {
   @override
   Future<List<HistoryEntry>> list() =>
       Future.delayed(const Duration(milliseconds: 50), super.list);
+}
+
+/// 결과를 손으로 돌려주는 공유 (잠금 시험용)
+class _HoldSharer implements Sharer {
+  var calls = 0;
+  final _pending = <Completer<ShareOutcome>>[];
+
+  @override
+  Future<ShareOutcome> shareText(String text) {
+    calls++;
+    final c = Completer<ShareOutcome>();
+    _pending.add(c);
+    return c.future;
+  }
+
+  void finish(ShareOutcome o) => _pending.removeAt(0).complete(o);
 }

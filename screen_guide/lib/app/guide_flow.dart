@@ -18,6 +18,7 @@ import 'package:screen_guide/shared/contracts/analysis.dart';
 import 'package:screen_guide/shared/contracts/error_code.dart';
 import 'package:screen_guide/shared/contracts/flow_state.dart';
 import 'package:screen_guide/shared/contracts/screen_id.dart';
+import 'package:screen_guide/shared/share_text.dart';
 
 /// 흐름 입구 (시스템설계_최종 6-2).
 ///
@@ -54,8 +55,7 @@ class GuideFlow extends ChangeNotifier {
   final GalleryInput _gallery; // 최정혁 (사진 가져오기)
   final CameraInput _camera; // 최정혁 (기기 기본 카메라)
   final InputCleanup _cleanup; // 최정혁
-  // ignore: unused_field
-  final Sharer _sharer; // 최정혁 — 공유(P → SHARE)를 만들 때 사용
+  final Sharer _sharer; // 최정혁 — SHARE의 "보내기"(shareSend)에서만 부른다
   final MapUpdater _mapUpdater; // 최정혁
 
   /// 기록 시각 (시험에서 고정할 수 있게 주입)
@@ -108,6 +108,12 @@ class GuideFlow extends ChangeNotifier {
   /// P는 이 안의 [ShareDraft.candidates]만 읽는다 (검토 결론 5장: 확인 화면이 받는 값은 유형과 가린 값의 목록만).
   ShareDraft? shareDraft;
 
+  /// SHARE 화면 미리보기 = 실제로 보낼 글. 보내기(_shareSend)와 같은 함수로 만든다 → 보이는 것과 보내는 것이 같다.
+  String? get shareText {
+    final d = shareDraft;
+    return d == null ? null : buildShareText(title: d.title, steps: d.steps);
+  }
+
   /// 사진을 가져오는 중 (갤러리 권한·목록·사용, 카메라 촬영). 켜져 있으면 [allowed]가 모든 버튼을 잠근다.
   /// 켜고 끄는 곳: `_openGallery`·`_confirm`·`_takePhoto`의 try/finally (어느 길로 끝나도 꺼진다).
   bool get capturing => _capturing;
@@ -118,6 +124,11 @@ class GuideFlow extends ChangeNotifier {
   /// 켜고 끄는 곳: `_openHistory`·`_openEntry`·`_deleteEntry`·`_openSettings`의 try/finally.
   bool get loadingRecords => _loadingRecords;
   bool _loadingRecords = false;
+
+  /// 공유 시트가 떠 있는 중. 켜져 있으면 [allowed]가 모든 버튼을 잠근다 ("보내기" 두 번 → 시트 두 번 방지).
+  /// 켜고 끄는 곳: `_shareSend`의 try/finally.
+  bool get sharing => _sharing;
+  bool _sharing = false;
 
   /// 권한이 거부된 입력 방식 (협업규격 3.4 "거부된 입력 방식을 세션에 기록", 3.6 세션 값).
   /// 권한 안내 화면(DENY)이 이 값을 보고 "설정 열기"와 "다른 방법으로 대신하기"를 고른다.
@@ -169,6 +180,8 @@ class GuideFlow extends ChangeNotifier {
     if (_capturing) return {};
     // 기록·설정 값을 읽는 중에도 같은 이유로 모두 잠금 (늦게 끝난 읽기가 화면을 덮어쓰지 않게)
     if (_loadingRecords) return {};
+    // 공유 시트가 떠 있는 동안에도 같은 이유로 모두 잠금
+    if (_sharing) return {};
     final s = {...StageTable.always, ...StageTable.allowedOn(screen)};
     // 대상을 찾는 중에는 단계 버튼 잠금 (3-6, 중복 실행 차단)
     if (locating) s.removeAll(_stepActions);
@@ -209,8 +222,6 @@ class GuideFlow extends ChangeNotifier {
   /// 누르면 "준비 중" 문구만 나오는 버튼. 기능을 만들면 여기서 빼고 [handle]의 switch에 진짜 갈래를 쓴다.
   /// 시험(guide_flow_test "버튼 등록부")이 28개 모두를 [handle]로 눌러 이 목록과 실제 동작이 같은지 본다.
   static const notReady = {
-    // 4.2 5번에서 채울 것
-    ActionId.shareSend,
     // 이번 제출에서 만들지 않는 것
     ActionId.syncToggle, // 동기화 동의 (일정_현실검토 3-2 [제안]: 설정 화면에서 뺌)
     ActionId.mapCheck, // Firebase 맵 갱신 (일정_현실검토 3-2: 지금 뺌)
@@ -281,8 +292,9 @@ class GuideFlow extends ChangeNotifier {
         _sharePrepare();
       case ActionId.shareConfirm:
         _shareConfirm();
-      // ── 아직 없는 기능: 하나씩 적는다 (목록은 [notReady]와 같아야 한다) ──
       case ActionId.shareSend:
+        await _shareSend();
+      // ── 아직 없는 기능: 하나씩 적는다 (목록은 [notReady]와 같아야 한다) ──
       case ActionId.syncToggle:
       case ActionId.mapCheck:
       case ActionId.overlaySetup:
@@ -578,6 +590,30 @@ class GuideFlow extends ChangeNotifier {
     if (shareDraft == null) return;
     _shareConfirmed = true;
     _go(ScreenId.share, state);
+  }
+
+  /// SHARE의 "보내기". 관문이 "확인함"이 켜져 있을 때만 이 버튼을 연다 (P를 거친 뒤에만, 검토 결론 5장 필수).
+  /// 보내는 것은 기능 제목 + 단계 문구로 만든 글뿐 (5-5a buildShareText).
+  /// 결과 (3-8): 보냄·닫음 → 들어온 곳 / 실패 → 안내 문구 후 들어온 곳.
+  Future<void> _shareSend() async {
+    final text = shareText;
+    // 관문이 막지만 한 번 더 확인 (보내는 곳은 여기 하나)
+    if (text == null || !_shareConfirmed) return;
+    _sharing = true;
+    try {
+      final outcome = await _sharer.shareText(text);
+      switch (outcome) {
+        case ShareOutcome.sent:
+          notice = '공유했어요';
+        case ShareOutcome.dismissed:
+          break; // 사용자가 닫음: 문구 없이 돌아간다
+        case ShareOutcome.failed:
+          notice = '공유하지 못했어요. 다시 시도해 주세요';
+      }
+      await _leaveShare();
+    } finally {
+      _sharing = false; // 어느 길로 끝나도 잠금을 푼다
+    }
   }
 
   /// 공유를 떠나 들어온 곳으로 (3-8 "뒤로 = 들어온 단계").
