@@ -179,8 +179,8 @@ class GuideFlow extends ChangeNotifier {
   // (일정_현실검토 3-2 — "모든 ID에 핸들러" 시험이 하던 일을 컴파일러가 한다).
   // 아직 없는 기능도 숨기지 않고 하나씩 적어서 [_notReady]로 보낸다 (시스템설계 6-2 ActionRegistry 줄: "핸들러가 있거나 '준비 중'으로 명시").
 
-  /// 누르면 "준비 중" 문구만 나오는 버튼. 기능을 만들면 여기서 빼고 위 switch에 진짜 갈래를 쓴다.
-  /// 시험(guide_flow_test "버튼 등록부")이 이 목록과 실제 동작이 같은지 본다.
+  /// 누르면 "준비 중" 문구만 나오는 버튼. 기능을 만들면 여기서 빼고 [handle]의 switch에 진짜 갈래를 쓴다.
+  /// 시험(guide_flow_test "버튼 등록부")이 28개 모두를 [handle]로 눌러 이 목록과 실제 동작이 같은지 본다.
   static const notReady = {
     // 4.2 5번에서 채울 것
     ActionId.sharePrepare,
@@ -199,8 +199,20 @@ class GuideFlow extends ChangeNotifier {
     ActionId.overlayRescan,
   };
 
+  /// 아직 없는 기능을 눌렀을 때의 문구 (화면·시험이 같은 값을 쓰게 한 곳에 둔다).
+  static const notReadyNotice = '이 기능은 아직 준비 중이에요';
+
+  /// 화면이 부르는 입구: 관문 → 처리 → 알림.
   Future<void> dispatch(ActionId id, [Object? arg]) async {
     if (!allows(id)) return;
+    await handle(id, arg);
+    notifyListeners();
+  }
+
+  /// 버튼 등록부: "누르면 무엇을 하나"만. 관문을 거치지 않으므로 화면은 반드시 [dispatch]를 부른다.
+  /// 시험만 직접 부른다 — 관문이 막는 버튼(홈에서 못 누르는 공유·기록 등)도 등록부를 확인하려고 (5-1 점검에서 발견).
+  @visibleForTesting
+  Future<void> handle(ActionId id, [Object? arg]) async {
     switch (id) {
       case ActionId.captureGallery:
         await _openGallery();
@@ -252,11 +264,10 @@ class GuideFlow extends ChangeNotifier {
       case ActionId.overlayRescan:
         _notReady();
     }
-    notifyListeners();
   }
 
   /// 아직 없는 기능: 화면은 그대로 두고 문구만 한 번 보여 준다.
-  void _notReady() => notice = '이 기능은 아직 준비 중이에요';
+  void _notReady() => notice = notReadyNotice;
 
   void clearNotice() => notice = null;
 

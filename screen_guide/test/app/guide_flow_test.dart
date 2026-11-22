@@ -307,16 +307,8 @@ void main() {
     expect(f.availableActions.map((a) => a.actionId), ['settings.battery']);
   });
 
-  test('준비 중인 기능은 안내 문구만 남긴다', () async {
-    final f = _flow();
-    // 카메라는 4.2 4번 단위 B에서 연결됨 → 아직 화면이 없는 기록 탭으로 확인
-    await f.dispatch(ActionId.navHistory);
-    expect(f.screen, ScreenId.h);
-    expect(f.notice, isNotNull);
-  });
-
   // 협업규격 4.2 5번 "모든 버튼 ID에 핸들러".
-  // 빠진 갈래는 컴파일러가 잡는다(dispatch의 switch에 default 없음). 시험은 '준비 중' 목록이 맞는지를 본다.
+  // 빠진 갈래는 컴파일러가 잡는다(handle의 switch에 default 없음). 시험은 '준비 중' 목록이 실제 처리와 같은지를 본다.
   group('버튼 등록부', () {
     test('준비 중 목록은 정한 13개뿐 — 기능을 만들면 여기서도 지운다', () {
       expect(GuideFlow.notReady, {
@@ -336,16 +328,25 @@ void main() {
       });
     });
 
-    test('홈(H)에서 누를 수 있는 버튼: 준비 중 목록에 있는 것만 "준비 중" 문구가 나온다', () async {
-      for (final id in testFlow().allowed) {
-        final f = testFlow(); // 버튼마다 새 흐름 (앞 버튼이 화면을 바꾸지 않게)
-        await f.dispatch(id);
+    test('28개 모두: 준비 중 목록에 있는 것만 "준비 중" 문구가 나온다', () async {
+      // 관문을 거치지 않는 handle로 누른다 → 홈에서 못 누르는 버튼(공유·기록 열기 등)도 확인된다.
+      // 진짜 기능을 넣고 목록에서 안 빼거나, 목록에서 빼고 진짜 기능을 안 넣으면 여기서 실패한다.
+      for (final id in ActionId.values) {
+        final f = testFlow(); // 버튼마다 새 흐름 (앞 버튼이 상태를 바꾸지 않게)
+        await f.handle(id);
         expect(
-          f.notice == '이 기능은 아직 준비 중이에요',
+          f.notice == GuideFlow.notReadyNotice,
           GuideFlow.notReady.contains(id),
           reason: '$id',
         );
       }
+    });
+
+    test('화면에서 준비 중 버튼을 누르면 화면은 그대로, 문구만 나온다', () async {
+      final f = _flow();
+      await f.dispatch(ActionId.navHistory); // 홈 하단 탭 (관문을 거치는 실제 길)
+      expect(f.screen, ScreenId.h);
+      expect(f.notice, GuideFlow.notReadyNotice);
     });
   });
 
