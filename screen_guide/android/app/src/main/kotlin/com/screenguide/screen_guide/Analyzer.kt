@@ -59,8 +59,11 @@ class Analyzer(private val context: Context) {
                     val pii = piiHits(elements, mlkit)
                     val total = SystemClock.elapsedRealtime() - t0
                     Log.i(tag, "total ${total}ms")
+                    val (uprightWidth, uprightHeight) =
+                        uprightSize(image.width, image.height, image.rotationDegrees)
+                    Log.i(tag, "rotation ${image.rotationDegrees}°, size ${uprightWidth}x${uprightHeight}")
                     onDone(ChannelCodec.encode(AnalyzeResult(
-                        requestId = req.requestId, width = image.width, height = image.height,
+                        requestId = req.requestId, width = uprightWidth, height = uprightHeight,
                         screenId = screen?.screenId,
                         elements = elements,
                         target = target,

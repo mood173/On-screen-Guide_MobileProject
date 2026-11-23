@@ -14,6 +14,17 @@ enum class MatchKind(val wire: String) { EXACT("exact"), FUZZY("fuzzy") }
 data class TargetMatch(val element: UiElement, val match: MatchKind)
 data class PiiHit(val type: String, val masked: String, val elementIndex: Int)
 
+// ---------- 이미지 기준 (EXIF 회전) ----------
+// InputImage는 비트맵을 돌리지 않고 EXIF 회전값(rotationDegrees)만 들고 있고,
+// ML Kit은 그 값대로 돌려서 인식한다 → 결과 상자(boundingBox)는 "세워진" 이미지 좌표다.
+// 그래서 응답에 싣는 imageSize도 세워진 크기여야 한다 (Flutter의 Image.file도 EXIF를 적용해 그린다).
+// 세로로 들고 찍은 사진(Orientation 6/8 = 90/270도)에서만 가로·세로가 뒤바뀐다.
+// 음수·360 초과 값도 정규화한다 (기기·플러그인에 따라 -90, 450 같은 값이 올 수 있다).
+fun uprightSize(width: Int, height: Int, rotationDegrees: Int): Pair<Int, Int> {
+    val normalized = ((rotationDegrees % 360) + 360) % 360
+    return if (normalized == 90 || normalized == 270) height to width else width to height
+}
+
 // ---------- F02 ----------
 fun toUiElements(lines: List<OcrLine>): List<UiElement> =
     lines
