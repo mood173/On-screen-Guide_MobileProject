@@ -34,6 +34,8 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // ML Kit가 R8로 깨지지 않게 keep 규칙 (N4)
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }
@@ -54,4 +56,6 @@ dependencies {
     implementation("com.google.mlkit:entity-extraction:16.0.0-beta6")
     // GuideLogic 단위 시험 (GuideLogicTest)
     testImplementation("junit:junit:4.13.2")
+    // contract_fixtures/analyze/*.json 을 읽는 ChannelCodecTest 용 (Android의 org.json은 단위 시험에서 동작하지 않음, N3)
+    testImplementation("com.google.code.gson:gson:2.11.0")
 }

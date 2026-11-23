@@ -6,7 +6,7 @@ import 'package:screen_guide/features/share/domain/sharer.dart';
 class FakeSharer implements Sharer {
   FakeSharer({this.outcome = ShareOutcome.sent});
 
-  /// 바꾸면 닫음·실패 흐름을 시험할 수 있다.
+  /// 바꾸면 닫음·미확인·실패 흐름을 시험할 수 있다.
   ShareOutcome outcome;
   final sent = <String>[];
 

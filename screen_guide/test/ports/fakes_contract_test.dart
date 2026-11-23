@@ -39,9 +39,9 @@ void main() {
       access: PickStatus.permissionDenied,
       loadThumbnail: _noThumb,
     );
-    expect(await denied.recent(), isEmpty);
+    expect((await denied.recent()).items, isEmpty);
     final g = FakeGalleryInput(loadThumbnail: _noThumb);
-    final items = await g.recent();
+    final items = (await g.recent()).items;
     expect(items, isNotEmpty);
     expect(items.every((e) => e.kind == GalleryKind.screenshot), isTrue);
   });

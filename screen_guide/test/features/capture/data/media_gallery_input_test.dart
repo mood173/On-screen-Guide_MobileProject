@@ -53,7 +53,9 @@ void main() {
         item('d', minute: 0),
       ],
     );
-    final list = await gallery(lib).recent(limit: 3);
+    final page = await gallery(lib).recent(limit: 3);
+    final list = page.items;
+    expect(page.failed, isFalse);
     expect(list.map((e) => e.id), ['a', 'b', 'c']);
     expect(list.map((e) => e.kind), [
       GalleryKind.screenshot,
@@ -75,21 +77,23 @@ void main() {
     expect(MediaGalleryInput.kindOf(null), GalleryKind.photo);
   });
 
-  test('권한이 없거나 보관함 오류면 빈 목록 (예외 없음), limit 0이면 빈 목록', () async {
-    expect(
-      await gallery(FakeLibrary(access: false, items: [item('a')])).recent(),
-      isEmpty,
-    );
-    expect(
-      await gallery(
-        FakeLibrary(items: [item('a')])..throwOnAll = StateError('x'),
-      ).recent(),
-      isEmpty,
-    );
-    expect(
-      await gallery(FakeLibrary(items: [item('a')])).recent(limit: 0),
-      isEmpty,
-    );
+  test('권한이 없거나 보관함 오류면 예외 없이 결과를 돌려준다 (실패는 failed로 구분)', () async {
+    final denied = await gallery(
+      FakeLibrary(access: false, items: [item('a')]),
+    ).recent();
+    expect(denied.items, isEmpty);
+    expect(denied.failed, isFalse); // 권한은 requestAccess가 판단한다
+
+    final broken = await gallery(
+      FakeLibrary(items: [item('a')])..throwOnAll = StateError('x'),
+    ).recent();
+    expect(broken.items, isEmpty);
+    expect(broken.failed, isTrue); // E-3: 읽기 실패를 빈 목록과 구분
+
+    final zero = await gallery(
+      FakeLibrary(items: [item('a')]),
+    ).recent(limit: 0);
+    expect(zero.items, isEmpty);
   });
 
   test('한 장 고르기 → 앱 복사본(sg_) 경로, 내용 그대로, 갤러리 입력', () async {

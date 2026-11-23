@@ -78,6 +78,13 @@ class _OneActionRepo implements GuidanceRepository {
   Future<String> activeRevision() async => 't';
 }
 
+/// 분석기가 예외를 던지는 경우 (E-4: 흐름이 삼켜서 화면이 멈추지 않아야 한다).
+class _ThrowingAnalyzer implements ScreenAnalyzer {
+  @override
+  Future<AnalysisResult> analyze(AnalyzeRequest request) =>
+      Future.error(StateError('boom'));
+}
+
 class _RecordingFiles implements ImageFiles {
   final released = <String>[];
   var _n = 0;
@@ -304,6 +311,32 @@ void main() {
     expect(saved.input, InputKind.gallery);
     expect(saved.createdAt, DateTime(2026, 11, 20, 10));
     expect(f.notice, '안내 기록에 저장했어요');
+  });
+
+  test('같은 안내를 두 번 저장해도 기록은 한 건 (E-6)', () async {
+    final history = InMemoryHistoryRepository();
+    final f = testFlow(history: history);
+    await _pickSample(f, SampleImage.chat);
+    await f.dispatch(ActionId.analyzeRun);
+    await f.dispatch(ActionId.guideStart, f.availableActions.single);
+    await f.dispatch(ActionId.guideNext);
+    await f.dispatch(ActionId.guideNext);
+    expect(f.screen, ScreenId.done);
+
+    await f.dispatch(ActionId.historySave);
+    expect(f.allows(ActionId.historySave), isFalse);
+    await f.dispatch(ActionId.historySave); // 관문이 두 번째 저장을 막는다
+    expect(await history.list(), hasLength(1));
+  });
+
+  test('분석기가 예외를 던져도 화면이 멈추지 않는다 (E-4)', () async {
+    final f = _flow(_ThrowingAnalyzer());
+    await _pickSample(f, SampleImage.settings);
+    await f.dispatch(ActionId.analyzeRun);
+    expect(f.notice, '문제가 생겼어요. 다시 시도해 주세요');
+    expect(f.locating, isFalse);
+    expect(f.screen, ScreenId.e, reason: '분석 중 예외는 오류 화면으로');
+    expect(f.error, ErrorCode.analysisFailed);
   });
 
   test('기능 목록은 GuidanceRepository에서 온다', () async {
@@ -663,6 +696,14 @@ void main() {
       final f = await toShare(FakeSharer(outcome: ShareOutcome.failed));
       await f.dispatch(ActionId.shareSend);
       expect(f.notice, '공유하지 못했어요. 다시 시도해 주세요');
+      expect(f.screen, ScreenId.done);
+    });
+
+    test('결과 미확인: 성공으로 단정하지 않고 사실만 안내 (E-7)', () async {
+      final f = await toShare(FakeSharer(outcome: ShareOutcome.unknown));
+      await f.dispatch(ActionId.shareSend);
+      expect(f.notice, '공유 시트를 열었어요');
+      expect(f.notice, isNot('공유했어요'));
       expect(f.screen, ScreenId.done);
     });
 

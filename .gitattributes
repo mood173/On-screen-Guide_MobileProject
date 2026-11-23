@@ -1,0 +1,17 @@
+# 줄바꿈 정규화 (E-14)
+# 저장소에는 LF로 저장하고, 체크아웃은 각 PC 설정(core.autocrlf)을 따른다.
+# 이 파일이 없어서 HEAD(LF)와 Windows 작업트리(CRLF)가 어긋나 git status가 234파일로 보였다.
+# 적용 후 한 번만: git add --renormalize . && git commit -m "chore: 줄바꿈 정규화"
+* text=auto
+
+# 이미지·바이너리는 변환하지 않는다
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.jar binary
+*.keystore binary

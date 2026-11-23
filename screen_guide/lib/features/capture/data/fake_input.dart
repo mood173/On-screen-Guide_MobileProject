@@ -36,17 +36,23 @@ class FakeGalleryInput implements GalleryInput {
   Future<PickStatus> requestAccess() async => access;
 
   @override
-  Future<List<GalleryItem>> recent({int limit = 9}) async {
-    if (access != PickStatus.ok) return const [];
-    return [
-      for (final (i, s) in samples.take(limit).indexed)
-        GalleryItem(
-          id: s.id,
-          thumbnail: await _loadThumbnail(s.asset),
-          kind: GalleryKind.screenshot,
-          takenAt: DateTime(2026, 11, 6, 12, 0).subtract(Duration(minutes: i)),
-        ),
-    ];
+  Future<GalleryPage> recent({int limit = 9}) async {
+    if (access != PickStatus.ok) {
+      return const GalleryPage(items: [], failed: false);
+    }
+    return GalleryPage(
+      items: [
+        for (final (i, s) in samples.take(limit).indexed)
+          GalleryItem(
+            id: s.id,
+            thumbnail: await _loadThumbnail(s.asset),
+            kind: GalleryKind.screenshot,
+            takenAt: DateTime(2026, 11, 6, 12, 0)
+                .subtract(Duration(minutes: i)),
+          ),
+      ],
+      failed: false,
+    );
   }
 
   @override

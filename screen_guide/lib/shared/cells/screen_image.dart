@@ -6,10 +6,9 @@ import 'package:screen_guide/shared/contracts/analysis.dart';
 import 'package:screen_guide/shared/coordinate_mapper.dart';
 import 'package:screen_guide/shared/theme/app_tokens.dart';
 
-/// 이미지 파일 위에 상자를 그리는 셀. 상자 좌표는 원본 이미지 픽셀 기준이라
-/// 좌표 변환 함수 [mapBox](shared/coordinate_mapper.dart)로 표시 크기에 맞춘다.
+/// 이미지 파일 위에 상자를 그리는 셀. 상자 좌표는 원본 이미지 픽셀 기준이라 표시 크기에 맞게 비율로 바꾼다.
 /// 이미지 크기([imageWidth]·[imageHeight])는 분석 응답의 imageSize를 넘긴다. 분석 전이면 비워 두고 사진만 그린다.
-/// 크기가 0 이하여도 사진만 그린다 (계약의 AnalysisResult는 크기가 없으면 0이다).
+/// (좌표 변환을 shared/의 순수 함수로 빼는 일은 협업규격_최종 4.2 4번에서 한다.)
 class ScreenImage extends StatelessWidget {
   const ScreenImage({
     super.key,
@@ -39,19 +38,15 @@ class ScreenImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = imageWidth, h = imageHeight;
-    // 크기를 믿을 수 있을 때만 원본 크기가 생긴다. null이면 사진만 그린다.
-    final source = (w != null && h != null && w > 0 && h > 0)
-        ? Size(w.toDouble(), h.toDouble())
-        : null;
     final image = Image.file(
       File(path),
-      fit: source == null ? BoxFit.contain : BoxFit.fill,
+      fit: w == null || h == null ? BoxFit.contain : BoxFit.fill,
       errorBuilder: (_, _, _) => const ColoredBox(
         color: AppColors.surface,
         child: Center(child: Icon(Icons.broken_image_outlined)),
       ),
     );
-    if (source == null) {
+    if (w == null || h == null) {
       return Container(
         height: height,
         decoration: BoxDecoration(
@@ -62,6 +57,7 @@ class ScreenImage extends StatelessWidget {
         child: image,
       );
     }
+    final aspect = w / h;
     return Container(
       height: height,
       decoration: BoxDecoration(
@@ -70,12 +66,13 @@ class ScreenImage extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: AspectRatio(
-        aspectRatio: source.aspectRatio,
+        aspectRatio: aspect,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: LayoutBuilder(
             builder: (context, c) {
-              Rect map(Box b) => mapBox(b, image: source, view: c.biggest);
+              final imageSize = Size(w.toDouble(), h.toDouble());
+              Rect map(Box b) => mapBox(b, image: imageSize, view: c.biggest);
               return Stack(
                 fit: StackFit.expand,
                 children: [

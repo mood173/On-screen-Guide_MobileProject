@@ -182,9 +182,9 @@ void galleryInputContract(String name, GalleryInput Function() create) {
 
     test('최근 목록은 limit장 이하, 고른 한 장은 gallery 입력', () async {
       final g = create();
-      final items = await g.recent(limit: 9);
+      final items = (await g.recent(limit: 9)).items;
       expect(items.length, lessThanOrEqualTo(9));
-      expect((await g.recent(limit: 1)).length, lessThanOrEqualTo(1));
+      expect((await g.recent(limit: 1)).items.length, lessThanOrEqualTo(1));
       for (final it in items) {
         _shape(await g.use(it.id), InputKind.gallery);
       }
