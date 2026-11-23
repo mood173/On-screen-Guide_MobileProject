@@ -31,3 +31,14 @@
 - 변경: `lib/features/capture/data/media_gallery_input.dart`(새 파일), `app_copy_files.dart`(`saveBytes`), `bootstrap.dart`(갤러리 줄, 실제 분석기 모드에서만 진짜), `pubspec.yaml`(`photo_manager`), 시험 3개 파일.
 - 검증: `flutter analyze` 0건, `flutter test` 149건 통과. Android 36 **에뮬레이터**에서 권한 허용·목록 4장·스크린샷 배지·한 장 고르기·해제·권한 거부 확인 (매니페스트 권한은 임시로 넣고 되돌림). 실기기 확인은 하지 않았다.
 - 남은 것: `ai_log/2026-11-13_gallery-input.md` 5장 (매니페스트 `READ_MEDIA_IMAGES` 선언은 강민준 요청).
+
+### 2026-11-16 · PR #3 합쳐짐, 매니페스트 권한 선언
+
+- PR #3·#4·#5가 main에 합쳐진 상태에서 `flutter analyze` 0건, `flutter test` 181건 통과, 에뮬레이터에서 앱 실행 확인.
+- `screen_guide/android/app/src/main/AndroidManifest.xml`에 `CAMERA`, `READ_MEDIA_IMAGES`, `READ_MEDIA_VISUAL_USER_SELECTED` 선언 — 사용자 지시로 main에 직접 push (`23d9a80`). `android/`는 강민준 담당이라 팀에 알릴 것.
+
+### 2026-11-21 · `HistoryRepository`·`Sharer` (로컬 브랜치 `feat/history-db`, 커밋 전)
+
+- 변경: `lib/features/history/data/sqlite_history_repository.dart`, `lib/features/share/data/share_plus_sharer.dart`(새 파일), `bootstrap.dart`(history·sharer 두 줄), `pubspec.yaml`(`sqflite`, `path`, `share_plus`, dev `sqflite_common_ffi`), 시험 4개 파일.
+- 검증: `flutter analyze` 0건, `flutter test` 199건 통과(Windows). Android 36 **에뮬레이터**에서 기록 저장·재시작 후 유지·삭제, 공유 시트 열림·닫음(`dismissed`)·앱 선택 확인. 실기기 확인은 하지 않았다.
+- 남은 것: `ai_log/2026-11-21_history-db.md`, `2026-11-21_sharer.md` 5장.

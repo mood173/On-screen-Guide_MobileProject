@@ -124,8 +124,8 @@ android/app/src/main/kotlin/com/screenguide/screen_guide/   ← 강민준
 | 담당 | 할 일 |
 |---|---|
 | 강민준 (분석·AI) | Kotlin 채널을 계약 형식으로 (`requestId`·`imagePath`·`guidance`·`target`, 응답 JSON, 오류는 본문·대문자), 맵은 요청으로 받기(`SAMPLE_MAPS` 삭제), 로그에서 인식 글자·가린 값 제거, 분석 규칙 A·B·C, 개인정보 유형 9개, 정규식 `` 결함, 실제 앱 기능 맵 내용. **JUnit은 `contract_fixtures/analyze/`를 읽어 시험** — 화면 ID가 `demo.settings`·`demo.chat`, 앵커가 바뀌었다. 지금 `FAKE_ANALYZER=false`로 돌리면 `NO_PATH`가 난다 |
+| 최정혁 (데이터·입출력) | **완료(PR #3)**: `CameraInput`(`PickerCameraInput`, image_picker)·`InputCleanup`(`FileInputCleanup`, app_settings)·`GalleryInput`(`MediaGalleryInput`, photo_manager — `FAKE_ANALYZER=false`일 때만)·기능 맵 스키마 v1과 `AssetGuidanceRepository`(앱에 든 JSON, 지금은 체험용 맵과 같은 내용), bootstrap 교체. **완료(PR 이번)**: `HistoryRepository`(`SqliteHistoryRepository`, sqflite)·`Sharer`(`SharePlusSharer`, share_plus). **남은 것**: 실제 앱 맵 탑재(내용은 강민준), (선택) MapUpdater Firebase, CI. 진짜 구현은 `test/ports/`의 공용 시험을 통과한 뒤 bootstrap의 자기 줄만 바꾼다. 설계: `docs/cijghk/데이터_입출력_설계.md` |
 | 지형주 (화면·흐름) | **완료**: 단계 설정표, 카메라 화면(CP·CR·CA·RC)·권한 안내(DENY) (PR #4), 좌표 변환 함수 `mapBox` (PR #6), 버튼 등록부, 기록·설정 화면, 공유 전 확인(P)·공유(SHARE), 공유 텍스트 함수 (PR #8). **남은 것**: 호출 시점(홈으로 오면 복사본 0개), 다른 화면 단계의 글 안내 카드·단계 맞추기, 복구 표, 진행 표시 5칸, (미룸) GuideSession |
-| 최정혁 (데이터·입출력) | **완료(PR #3)**: `CameraInput`(`PickerCameraInput`, image_picker)·`InputCleanup`(`FileInputCleanup`, app_settings)·`GalleryInput`(`MediaGalleryInput`, photo_manager — `FAKE_ANALYZER=false`일 때만)·기능 맵 스키마 v1과 `AssetGuidanceRepository`(앱에 든 JSON, 지금은 체험용 맵과 같은 내용), bootstrap 교체. **남은 것**: 실제 앱 맵 탑재(내용은 강민준), 기록 로컬 DB, Sharer, (선택) MapUpdater Firebase, CI. 진짜 구현은 `test/ports/`의 공용 시험을 통과한 뒤 bootstrap의 자기 줄만 바꾼다. 설계: `docs/cijghk/데이터_입출력_설계.md` |
 | 공통 | release 빌드 시 ML Kit가 코드 축소(R8)로 깨져 시작 즉시 종료됨 → proguard keep 규칙 필요. 11/13 팀 확인: `ShareOutcome` 세 값, `packageName` 빈 문자열, 의존 규칙 예외(화면 → `app/guide_flow.dart`) |
 
 일정 조정안(일정_현실검토 3-1 "일 옮기기")은 적용되지 않았다: 좌표 변환·공유 텍스트 함수는 협업규격 4.2대로 지형주가 만들었다.
