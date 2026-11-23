@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:screen_guide/app/guide_flow.dart';
@@ -10,11 +12,15 @@ import 'package:screen_guide/features/guidance_map/data/demo_guidance.dart';
 import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
 import 'package:screen_guide/features/history/data/in_memory_history_repository.dart';
+import 'package:screen_guide/features/history/domain/history.dart';
+import 'package:screen_guide/features/share/data/fake_sharer.dart';
+import 'package:screen_guide/features/share/domain/sharer.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/contracts/analysis.dart';
 import 'package:screen_guide/shared/contracts/error_code.dart';
 import 'package:screen_guide/shared/contracts/flow_state.dart';
 import 'package:screen_guide/shared/contracts/screen_id.dart';
+import 'package:screen_guide/shared/share_text.dart';
 
 import '../support/test_flow.dart';
 
@@ -286,7 +292,7 @@ void main() {
     expect(f.screen, ScreenId.done);
 
     await f.dispatch(ActionId.historySave);
-    final saved = (await f.historyList()).single;
+    final saved = (await history.list()).single;
     expect(saved.actionId, 'chat.send');
     expect(saved.stepInstructions, hasLength(2));
     expect(saved.piiTypes, hasLength(5));
@@ -307,12 +313,465 @@ void main() {
     expect(f.availableActions.map((a) => a.actionId), ['settings.battery']);
   });
 
-  test('준비 중인 기능은 안내 문구만 남긴다', () async {
-    final f = _flow();
-    // 카메라는 4.2 4번 단위 B에서 연결됨 → 아직 화면이 없는 기록 탭으로 확인
-    await f.dispatch(ActionId.navHistory);
-    expect(f.screen, ScreenId.h);
-    expect(f.notice, isNotNull);
+  // 시스템설계 3-9 기록·설정, 9장 "기록을 다시 본다 / 지운다" (협업규격 4.2 5번)
+  group('기록 화면 (HISTORY)', () {
+    HistoryEntry entry(String id, int hour) => HistoryEntry(
+      id: id,
+      actionId: 'chat.send',
+      actionTitle: '메시지 보내기 $id',
+      stepInstructions: const ['입력창을 누르세요', '보내기를 누르세요'],
+      input: InputKind.gallery,
+      createdAt: DateTime(2026, 11, 20, hour),
+    );
+
+    Future<(GuideFlow, InMemoryHistoryRepository)> withTwo() async {
+      final history = InMemoryHistoryRepository();
+      await history.save(entry('a', 9));
+      await history.save(entry('b', 10));
+      return (testFlow(history: history), history);
+    }
+
+    test('기록이 0건: 탭을 누르면 HISTORY, 목록은 비어 있다', () async {
+      final f = _flow();
+      await f.dispatch(ActionId.navHistory);
+      expect(f.screen, ScreenId.history);
+      expect(f.historyItems, isEmpty);
+      expect(f.openedEntry, isNull);
+    });
+
+    test('여러 건: 최근 것부터 읽어 둔다', () async {
+      final (f, _) = await withTwo();
+      await f.dispatch(ActionId.navHistory);
+      expect(f.historyItems.map((e) => e.id), ['b', 'a']);
+    });
+
+    test('다시 보기: 한 건을 펼치면 단계 문구가 있다, 뒤로 → 목록 → 홈', () async {
+      final (f, _) = await withTwo();
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.historyOpen, 'a');
+      expect(f.openedEntry?.id, 'a');
+      expect(f.openedEntry?.stepInstructions, hasLength(2));
+
+      await f.dispatch(ActionId.navBack); // 펼침 닫기
+      expect(f.screen, ScreenId.history);
+      expect(f.openedEntry, isNull);
+
+      await f.dispatch(ActionId.navBack); // 목록 → 홈
+      expect(f.screen, ScreenId.h);
+    });
+
+    test('지우기: 저장소에서 지우고 목록을 다시 읽는다', () async {
+      final (f, history) = await withTwo();
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.historyDelete, 'b');
+      expect(f.historyItems.map((e) => e.id), ['a']);
+      expect(await history.get('b'), isNull);
+    });
+
+    test('펼쳐 둔 기록을 지우면 펼침이 닫힌다 / 다른 기록을 지우면 그대로', () async {
+      final (f, _) = await withTwo();
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.historyOpen, 'a');
+      await f.dispatch(ActionId.historyDelete, 'b');
+      expect(f.openedEntry?.id, 'a', reason: '다른 기록을 지움');
+      await f.dispatch(ActionId.historyDelete, 'a');
+      expect(f.openedEntry, isNull, reason: '펼쳐 둔 기록을 지움');
+      expect(f.historyItems, isEmpty);
+    });
+
+    test('이미 지워진 기록을 열면: 펼치지 않고 목록을 새로 읽는다', () async {
+      final (f, history) = await withTwo();
+      await f.dispatch(ActionId.navHistory);
+      await history.delete('a'); // 화면 목록에는 아직 a가 있다
+      await f.dispatch(ActionId.historyOpen, 'a');
+      expect(f.openedEntry, isNull);
+      expect(f.historyItems.map((e) => e.id), ['b']);
+    });
+
+    test('기록 화면을 떠나면 값을 비운다 (홈 탭)', () async {
+      final (f, _) = await withTwo();
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.historyOpen, 'a');
+      await f.dispatch(ActionId.navHome);
+      expect(f.screen, ScreenId.h);
+      expect(f.historyItems, isEmpty);
+      expect(f.openedEntry, isNull);
+    });
+
+    test('기록 화면에서 열리는 버튼: 열기·지우기·공유 + 하단 탭 + 뒤로 (3-9)', () async {
+      final f = _flow();
+      await f.dispatch(ActionId.navHistory);
+      expect(f.allowed, {
+        ActionId.historyOpen,
+        ActionId.historyDelete,
+        ActionId.sharePrepare,
+        ActionId.navHome,
+        ActionId.navHistory,
+        ActionId.navSettings,
+        ActionId.navBack,
+      });
+    });
+  });
+
+  // 시스템설계 3-9 SETTINGS, 일정_현실검토 3-2 [제안] "권한 상태와 맵 revision 두 줄" (협업규격 4.2 5번)
+  group('설정 화면 (SETTINGS)', () {
+    test('설정 탭 → SETTINGS, 기능 맵 revision을 읽어 둔다', () async {
+      final f = testFlow(guidance: _OneActionRepo()); // revision 't'
+      await f.dispatch(ActionId.navSettings);
+      expect(f.screen, ScreenId.settings);
+      expect(f.mapRevision, 't');
+    });
+
+    test('권한 관리 → 기기 설정을 열고 설정 화면에 머문다 (권한을 요청하지 않는다)', () async {
+      final cleanup = _RecordingCleanup();
+      final f = testFlow(cleanup: cleanup);
+      await f.dispatch(ActionId.navSettings);
+      await f.dispatch(ActionId.settingsOpenPermission);
+      expect(cleanup.settingsOpened, 1);
+      expect(f.screen, ScreenId.settings);
+    });
+
+    test('기록 ↔ 설정 탭을 오가도 기록은 새로 읽는다', () async {
+      final history = InMemoryHistoryRepository();
+      final f = testFlow(history: history);
+      await f.dispatch(ActionId.navSettings);
+      await f.dispatch(ActionId.navHistory);
+      expect(f.screen, ScreenId.history);
+      expect(f.historyItems, isEmpty);
+
+      await history.save(
+        HistoryEntry(
+          id: 'a',
+          actionId: 'chat.send',
+          actionTitle: '메시지 보내기',
+          stepInstructions: const ['보내기를 누르세요'],
+          input: InputKind.gallery,
+          createdAt: DateTime(2026, 11, 20),
+        ),
+      );
+      await f.dispatch(ActionId.navSettings);
+      await f.dispatch(ActionId.navHistory);
+      expect(f.historyItems.map((e) => e.id), ['a'], reason: '설정에 다녀오면 다시 읽음');
+    });
+
+    test('뒤로 → 홈, 떠나면 revision을 비운다', () async {
+      final f = _flow();
+      await f.dispatch(ActionId.navSettings);
+      await f.dispatch(ActionId.navBack);
+      expect(f.screen, ScreenId.h);
+      expect(f.mapRevision, isNull);
+    });
+
+    test('설정 화면에서 열리는 버튼: 권한 설정·동기화 + 하단 탭 + 뒤로 (3-9)', () async {
+      final f = _flow();
+      await f.dispatch(ActionId.navSettings);
+      expect(f.allowed, {
+        ActionId.settingsOpenPermission,
+        ActionId.syncToggle, // 표에는 있고 처리는 '준비 중' (일정_현실검토 3-2: 동기화 동의는 뺀다)
+        ActionId.navHome,
+        ActionId.navHistory,
+        ActionId.navSettings,
+        ActionId.navBack,
+      });
+    });
+  });
+
+  // 시스템설계 3-8 공유, 검토 결론 5장 (협업규격 4.2 5번). SHARE 화면·보내기는 5-5.
+  group('공유 전 확인 (P)', () {
+    /// chat 샘플로 안내를 끝까지 → DONE (후보 5건)
+    Future<GuideFlow> toDone() async {
+      final f = _flow();
+      await _pickSample(f, SampleImage.chat);
+      await f.dispatch(ActionId.analyzeRun);
+      await f.dispatch(ActionId.guideStart, f.availableActions.single);
+      await f.dispatch(ActionId.guideNext);
+      await f.dispatch(ActionId.guideNext);
+      expect(f.screen, ScreenId.done);
+      return f;
+    }
+
+    Future<GuideFlow> toOpenedHistory({List<String> pii = const []}) async {
+      final history = InMemoryHistoryRepository();
+      await history.save(
+        HistoryEntry(
+          id: 'a',
+          actionId: 'chat.send',
+          actionTitle: '메시지 보내기',
+          stepInstructions: const ['입력창을 누르세요', '보내기를 누르세요'],
+          input: InputKind.gallery,
+          createdAt: DateTime(2026, 11, 20),
+          piiTypes: pii,
+        ),
+      );
+      final f = testFlow(history: history);
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.historyOpen, 'a');
+      return f;
+    }
+
+    test('DONE에서 공유하기 → P, 후보는 유형 + 가린 값', () async {
+      final f = await toDone();
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.screen, ScreenId.p);
+      final d = f.shareDraft!;
+      expect(d.from, ScreenId.done);
+      expect(d.steps, hasLength(2));
+      expect(d.candidates, hasLength(5));
+      expect(
+        d.candidates.every((c) => c.masked != null),
+        isTrue,
+        reason: '세션에서 왔으니 가린 값이 있다',
+      );
+    });
+
+    test('기록에서 공유하기 → P, 후보는 유형 이름만 (가린 값 없음, 필수)', () async {
+      final f = await toOpenedHistory(pii: ['휴대전화', '이메일']);
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.screen, ScreenId.p);
+      final d = f.shareDraft!;
+      expect(d.from, ScreenId.history);
+      expect(d.title, '메시지 보내기');
+      expect(d.candidates.map((c) => c.type), ['휴대전화', '이메일']);
+      expect(d.candidates.every((c) => c.masked == null), isTrue);
+    });
+
+    test('후보가 0건이어도 P를 거친다 (3-8 관문)', () async {
+      final f = await toOpenedHistory();
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.screen, ScreenId.p);
+      expect(f.shareDraft!.candidates, isEmpty);
+    });
+
+    test('기록을 펼치지 않고 공유하기가 오면 아무것도 하지 않는다', () async {
+      final f = _flow();
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.screen, ScreenId.history);
+      expect(f.shareDraft, isNull);
+    });
+
+    test('P에서는 보내기가 잠겨 있고, 확인했어요 → SHARE에서 열린다', () async {
+      final f = await toDone();
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.allowed, {ActionId.shareConfirm, ActionId.navBack});
+      expect(f.shareConfirmed, isFalse);
+
+      await f.dispatch(ActionId.shareConfirm);
+      expect(f.screen, ScreenId.share);
+      expect(f.shareConfirmed, isTrue);
+      expect(f.allowed, {
+        ActionId.shareSend,
+        ActionId.navBack,
+      }, reason: 'SHARE에서 열리는 버튼 (3-8)');
+    });
+
+    test('뒤로: SHARE → P(확인함 유지) → DONE, 떠나면 공유 내용을 지운다', () async {
+      final f = await toDone();
+      await f.dispatch(ActionId.sharePrepare);
+      await f.dispatch(ActionId.shareConfirm);
+
+      await f.dispatch(ActionId.navBack);
+      expect(f.screen, ScreenId.p, reason: 'SHARE → P 한 칸 (결정 ㉮)');
+      expect(f.shareConfirmed, isTrue, reason: '같은 공유 단계 안');
+
+      await f.dispatch(ActionId.navBack);
+      expect(f.screen, ScreenId.done);
+      expect(f.shareDraft, isNull);
+      expect(f.action, isNotNull, reason: '세션은 그대로 (마무리로 돌아옴)');
+    });
+
+    test('기록에서 왔으면 P에서 뒤로 → 기록을 다시 읽고 그 기록을 펼친 채로', () async {
+      final f = await toOpenedHistory();
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.historyItems, isEmpty, reason: '공유 단계로 넘어가며 기록 값이 비워짐');
+
+      await f.dispatch(ActionId.navBack);
+      expect(f.screen, ScreenId.history);
+      expect(f.historyItems.map((e) => e.id), ['a']);
+      expect(f.openedEntry?.id, 'a');
+    });
+
+    test('다시 공유하기를 누르면 "확인함"이 지워져 P를 다시 거친다', () async {
+      final f = await toDone();
+      await f.dispatch(ActionId.sharePrepare);
+      await f.dispatch(ActionId.shareConfirm);
+      await f.dispatch(ActionId.navBack); // → P
+      await f.dispatch(ActionId.navBack); // → DONE
+
+      await f.dispatch(ActionId.sharePrepare);
+      expect(f.screen, ScreenId.p);
+      expect(f.shareConfirmed, isFalse);
+      expect(f.allows(ActionId.shareSend), isFalse);
+    });
+  });
+
+  // 시스템설계 3-8 SHARE 결과, 검토 결론 5장 (협업규격 4.2 5번). 화면은 5-5c.
+  group('보내기 (SHARE)', () {
+    /// chat 샘플로 안내 끝 → 공유하기 → 확인했어요 → SHARE
+    Future<GuideFlow> toShare(Sharer sharer) async {
+      final f = testFlow(sharer: sharer);
+      await _pickSample(f, SampleImage.chat);
+      await f.dispatch(ActionId.analyzeRun);
+      await f.dispatch(ActionId.guideStart, f.availableActions.single);
+      await f.dispatch(ActionId.guideNext);
+      await f.dispatch(ActionId.guideNext);
+      await f.dispatch(ActionId.sharePrepare);
+      await f.dispatch(ActionId.shareConfirm);
+      expect(f.screen, ScreenId.share);
+      return f;
+    }
+
+    test('보냄: 미리보기 글 그대로 보내고 "공유했어요", 마무리로 돌아간다', () async {
+      final sharer = FakeSharer();
+      final f = await toShare(sharer);
+      final preview = f.shareText!;
+      expect(
+        preview,
+        buildShareText(
+          title: f.action!.title,
+          steps: [for (final s in f.action!.steps) s.instruction],
+        ),
+      );
+
+      await f.dispatch(ActionId.shareSend);
+      expect(sharer.sent, [preview], reason: '보이는 글 = 보내는 글');
+      expect(f.notice, '공유했어요');
+      expect(f.screen, ScreenId.done);
+      expect(f.shareDraft, isNull);
+      expect(f.shareText, isNull);
+    });
+
+    test('보낸 글에 가린 값이 없다 (세션에 후보 5건이 있어도)', () async {
+      final sharer = FakeSharer();
+      final f = await toShare(sharer);
+      final masked = [for (final p in f.result!.pii) p.masked];
+      expect(masked, hasLength(5));
+      await f.dispatch(ActionId.shareSend);
+      for (final m in masked) {
+        expect(sharer.sent.single, isNot(contains(m)));
+      }
+    });
+
+    test('닫음: 문구 없이 마무리로', () async {
+      final f = await toShare(FakeSharer(outcome: ShareOutcome.dismissed));
+      await f.dispatch(ActionId.shareSend);
+      expect(f.notice, isNull);
+      expect(f.screen, ScreenId.done);
+    });
+
+    test('실패: 안내 문구 후 마무리로 (3-8)', () async {
+      final f = await toShare(FakeSharer(outcome: ShareOutcome.failed));
+      await f.dispatch(ActionId.shareSend);
+      expect(f.notice, '공유하지 못했어요. 다시 시도해 주세요');
+      expect(f.screen, ScreenId.done);
+    });
+
+    test('기록에서 왔으면 보낸 뒤 기록으로 (그 기록을 펼친 채로)', () async {
+      final history = InMemoryHistoryRepository();
+      await history.save(
+        HistoryEntry(
+          id: 'a',
+          actionId: 'chat.send',
+          actionTitle: '메시지 보내기',
+          stepInstructions: const ['보내기를 누르세요'],
+          input: InputKind.gallery,
+          createdAt: DateTime(2026, 11, 20),
+        ),
+      );
+      final sharer = FakeSharer();
+      final f = testFlow(history: history, sharer: sharer);
+      await f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.historyOpen, 'a');
+      await f.dispatch(ActionId.sharePrepare);
+      await f.dispatch(ActionId.shareConfirm);
+      await f.dispatch(ActionId.shareSend);
+
+      expect(
+        sharer.sent.single,
+        buildShareText(title: '메시지 보내기', steps: const ['보내기를 누르세요']),
+      );
+      expect(f.screen, ScreenId.history);
+      expect(f.openedEntry?.id, 'a');
+    });
+
+    test('공유 시트가 떠 있는 동안 모든 버튼 잠금, 두 번 눌러도 한 번만 보낸다', () async {
+      final sharer = _HoldSharer();
+      final f = await toShare(sharer);
+      final first = f.dispatch(ActionId.shareSend);
+      expect(f.sharing, isTrue);
+      expect(f.allowed, isEmpty);
+      await f.dispatch(ActionId.shareSend); // 잠금이라 무시
+      expect(sharer.calls, 1);
+
+      sharer.finish(ShareOutcome.sent);
+      await first;
+      expect(f.sharing, isFalse);
+      expect(f.screen, ScreenId.done);
+    });
+  });
+
+  // 5-3a 점검: 저장소가 느릴 때 탭을 빠르게 두 번 누르면, 늦게 끝난 읽기가 마지막에 누른 화면을 덮어썼다.
+  // 읽는 동안 버튼을 잠가(loadingRecords) 두 번째 탭을 무시한다 (11/14 사진 가져오기 연타 차단과 같은 방식).
+  group('기록·설정 읽는 중 연타', () {
+    test('설정(느림)을 누르고 바로 기록을 누르면: 두 번째는 무시, 설정 화면', () async {
+      final f = testFlow(guidance: _SlowRevision());
+      final first = f.dispatch(ActionId.navSettings);
+      expect(f.loadingRecords, isTrue);
+      expect(f.allowed, isEmpty);
+      await f.dispatch(ActionId.navHistory); // 읽는 중이라 무시
+      await first;
+      expect(f.screen, ScreenId.settings);
+      expect(f.loadingRecords, isFalse);
+    });
+
+    test('기록(느림)을 누르고 바로 설정을 누르면: 두 번째는 무시, 기록 화면', () async {
+      final f = testFlow(history: _SlowHistory());
+      final first = f.dispatch(ActionId.navHistory);
+      await f.dispatch(ActionId.navSettings); // 읽는 중이라 무시
+      await first;
+      expect(f.screen, ScreenId.history);
+      // 화면만 보면 잠금이 없어도 기록으로 끝난다(설정이 먼저 끝나고 늦은 기록이 덮어씀).
+      // 그래서 "두 번째 탭이 아예 실행되지 않았다"를 revision으로 확인한다.
+      expect(f.mapRevision, isNull, reason: '설정 탭은 무시되어 revision을 읽지 않았다');
+      expect(f.allows(ActionId.navSettings), isTrue, reason: '다 읽으면 잠금이 풀린다');
+    });
+  });
+
+  // 협업규격 4.2 5번 "모든 버튼 ID에 핸들러".
+  // 빠진 갈래는 컴파일러가 잡는다(handle의 switch에 default 없음). 시험은 '준비 중' 목록이 실제 처리와 같은지를 본다.
+  group('버튼 등록부', () {
+    test('준비 중 목록은 정한 6개뿐 — 기능을 만들면 여기서도 지운다', () {
+      expect(GuideFlow.notReady, {
+        ActionId.syncToggle,
+        ActionId.mapCheck,
+        ActionId.overlaySetup,
+        ActionId.overlayStart,
+        ActionId.overlayStop,
+        ActionId.overlayRescan,
+      });
+    });
+
+    test('28개 모두: 준비 중 목록에 있는 것만 "준비 중" 문구가 나온다', () async {
+      // 관문을 거치지 않는 handle로 누른다 → 홈에서 못 누르는 버튼(공유·기록 열기 등)도 확인된다.
+      // 진짜 기능을 넣고 목록에서 안 빼거나, 목록에서 빼고 진짜 기능을 안 넣으면 여기서 실패한다.
+      for (final id in ActionId.values) {
+        final f = testFlow(); // 버튼마다 새 흐름 (앞 버튼이 상태를 바꾸지 않게)
+        await f.handle(id);
+        expect(
+          f.notice == GuideFlow.notReadyNotice,
+          GuideFlow.notReady.contains(id),
+          reason: '$id',
+        );
+      }
+    });
+
+    test('화면에서 준비 중 버튼을 누르면 화면은 그대로, 문구만 나온다', () async {
+      final f = _flow();
+      // 홈의 "화면 실시간 스캔" (관문을 거치는 실제 길, N01은 일정 제외)
+      await f.dispatch(ActionId.overlaySetup);
+      expect(f.screen, ScreenId.h);
+      expect(f.notice, GuideFlow.notReadyNotice);
+    });
   });
 
   test(
@@ -632,4 +1091,34 @@ class _RecordingCleanup implements InputCleanup {
   Future<void> openAppSettings() async => settingsOpened++;
   @override
   Future<void> release(PickedImage image) async {}
+}
+
+/// revision을 늦게 돌려주는 기능 맵 (연타 시험용)
+class _SlowRevision extends DemoGuidanceRepository {
+  @override
+  Future<String> activeRevision() =>
+      Future.delayed(const Duration(milliseconds: 50), () => 'slow');
+}
+
+/// 목록을 늦게 돌려주는 기록 저장소 (연타 시험용)
+class _SlowHistory extends InMemoryHistoryRepository {
+  @override
+  Future<List<HistoryEntry>> list() =>
+      Future.delayed(const Duration(milliseconds: 50), super.list);
+}
+
+/// 결과를 손으로 돌려주는 공유 (잠금 시험용)
+class _HoldSharer implements Sharer {
+  var calls = 0;
+  final _pending = <Completer<ShareOutcome>>[];
+
+  @override
+  Future<ShareOutcome> shareText(String text) {
+    calls++;
+    final c = Completer<ShareOutcome>();
+    _pending.add(c);
+    return c.future;
+  }
+
+  void finish(ShareOutcome o) => _pending.removeAt(0).complete(o);
 }

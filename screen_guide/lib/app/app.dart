@@ -10,7 +10,11 @@ import 'package:screen_guide/features/guide/ui/done_screen.dart';
 import 'package:screen_guide/features/guide/ui/error_screen.dart';
 import 'package:screen_guide/features/guide/ui/guide_step_screen.dart';
 import 'package:screen_guide/features/guide/ui/result_screen.dart';
+import 'package:screen_guide/features/history/ui/history_screen.dart';
+import 'package:screen_guide/features/privacy/ui/privacy_check_screen.dart';
 import 'package:screen_guide/features/settings/ui/deny_screen.dart';
+import 'package:screen_guide/features/settings/ui/settings_screen.dart';
+import 'package:screen_guide/features/share/ui/share_screen.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/contracts/screen_id.dart';
 import 'package:screen_guide/shared/theme/app_theme.dart';
@@ -82,6 +86,26 @@ class _FlowShellState extends State<FlowShell> {
     ScreenId.done => DoneScreen(flow: flow),
     ScreenId.e => ErrorScreen(flow: flow),
     ScreenId.deny => DenyScreen(flow: flow),
+    ScreenId.history => HistoryScreen(flow: flow),
+    ScreenId.settings => SettingsScreen(flow: flow),
+    // P는 흐름을 모르게 목록과 버튼 동작만 넘긴다 (검토 결론 5장 필수)
+    ScreenId.p => PrivacyCheckScreen(
+      candidates: flow.shareDraft?.candidates ?? const [],
+      onConfirm: flow.allows(ActionId.shareConfirm)
+          ? () => flow.dispatch(ActionId.shareConfirm)
+          : null,
+      onBack: () => flow.dispatch(ActionId.navBack),
+    ),
+    // SHARE도 보낼 글과 버튼 동작만 넘긴다 (미리보기 = 보낼 글, flow.shareText)
+    ScreenId.share => ShareScreen(
+      text: flow.shareText ?? '',
+      onSend: flow.allows(ActionId.shareSend)
+          ? () => flow.dispatch(ActionId.shareSend)
+          : null,
+      onBack: flow.allows(ActionId.navBack)
+          ? () => flow.dispatch(ActionId.navBack)
+          : null,
+    ),
     _ => HomeScreen(flow: flow),
   };
 

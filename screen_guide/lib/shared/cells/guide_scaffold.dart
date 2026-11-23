@@ -59,6 +59,8 @@ class GuideScaffold extends StatelessWidget {
                           padding: EdgeInsets.fromLTRB(0, 8, 20, 8),
                           child: Text(
                             '‹',
+                            // 화면 읽기(TalkBack)가 기호 대신 "뒤로"라고 읽게 (5-4b 점검, 툴바가 있는 모든 화면)
+                            semanticsLabel: '뒤로',
                             style: TextStyle(
                               fontSize: 26,
                               color: AppColors.textStatus,

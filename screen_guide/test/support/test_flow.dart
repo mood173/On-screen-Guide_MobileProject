@@ -14,6 +14,7 @@ import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
 import 'package:screen_guide/features/history/data/in_memory_history_repository.dart';
 import 'package:screen_guide/features/history/domain/history.dart';
 import 'package:screen_guide/features/share/data/fake_sharer.dart';
+import 'package:screen_guide/features/share/domain/sharer.dart';
 
 Future<Uint8List> noThumbnail(String _) async => Uint8List(0);
 
@@ -25,6 +26,7 @@ GuideFlow testFlow({
   GalleryInput? gallery,
   CameraInput? camera,
   InputCleanup? cleanup,
+  Sharer? sharer,
   Duration slowAfter = const Duration(seconds: 3),
   DateTime Function()? now,
 }) => GuideFlow(
@@ -35,7 +37,7 @@ GuideFlow testFlow({
       gallery ?? FakeGalleryInput(files: files, loadThumbnail: noThumbnail),
   cameraInput: camera ?? FakeCameraInput(files: files),
   inputCleanup: cleanup ?? FakeInputCleanup(files: files),
-  sharer: FakeSharer(),
+  sharer: sharer ?? FakeSharer(),
   mapUpdater: FakeMapUpdater(),
   slowAfter: slowAfter,
   now: now ?? () => DateTime(2026, 11, 20, 10),
