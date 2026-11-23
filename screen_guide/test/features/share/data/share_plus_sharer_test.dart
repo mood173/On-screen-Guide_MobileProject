@@ -10,12 +10,12 @@ import 'package:screen_guide/features/share/domain/sharer.dart';
 
 void main() {
   test(
-    '결과 변환: success → sent, dismissed → dismissed, unavailable → sent',
+    '결과 변환: success → sent, dismissed → dismissed, unavailable → unknown',
     () async {
       for (final (status, outcome) in [
         (ShareResultStatus.success, ShareOutcome.sent),
         (ShareResultStatus.dismissed, ShareOutcome.dismissed),
-        (ShareResultStatus.unavailable, ShareOutcome.sent),
+        (ShareResultStatus.unavailable, ShareOutcome.unknown),
       ]) {
         final s = SharePlusSharer(sheet: (_) async => status);
         expect(

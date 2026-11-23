@@ -11,6 +11,7 @@ import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/features/history/data/in_memory_history_repository.dart';
 import 'package:screen_guide/features/history/domain/history.dart';
 import 'package:screen_guide/features/privacy/ui/privacy_check_screen.dart';
+import 'package:screen_guide/features/share/domain/share_draft.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/contracts/screen_id.dart';
 

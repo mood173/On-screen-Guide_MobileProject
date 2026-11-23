@@ -128,21 +128,25 @@ class MediaGalleryInput implements GalleryInput {
   }
 
   @override
-  Future<List<GalleryItem>> recent({int limit = 9}) async {
-    if (limit <= 0) return const [];
+  Future<GalleryPage> recent({int limit = 9}) async {
+    if (limit <= 0) return const GalleryPage(items: [], failed: false);
     try {
       final items = await _library.latest(limit);
-      return [
-        for (final m in items.take(limit))
-          GalleryItem(
-            id: m.id,
-            thumbnail: m.thumbnail,
-            kind: kindOf(m.relativePath),
-            takenAt: m.createdAt,
-          ),
-      ];
+      return GalleryPage(
+        items: [
+          for (final m in items.take(limit))
+            GalleryItem(
+              id: m.id,
+              thumbnail: m.thumbnail,
+              kind: kindOf(m.relativePath),
+              takenAt: m.createdAt,
+            ),
+        ],
+        failed: false,
+      );
     } catch (_) {
-      return const [];
+      // 빈 목록과 구분해 돌려준다 — 화면이 "사진 없음"과 "읽지 못함"을 다르게 안내한다 (E-3).
+      return const GalleryPage(items: [], failed: true);
     }
   }
 

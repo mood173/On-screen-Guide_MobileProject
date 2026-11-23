@@ -12,6 +12,7 @@ import 'package:screen_guide/features/capture/domain/image_input.dart';
 import 'package:screen_guide/features/guidance_map/domain/guidance.dart';
 import 'package:screen_guide/features/guidance_map/domain/map_updater.dart';
 import 'package:screen_guide/features/history/domain/history.dart';
+import 'package:screen_guide/features/share/domain/share_draft.dart';
 import 'package:screen_guide/features/share/domain/sharer.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/contracts/analysis.dart';
@@ -125,6 +126,9 @@ class GuideFlow extends ChangeNotifier {
   bool get loadingRecords => _loadingRecords;
   bool _loadingRecords = false;
 
+  /// 이번 안내를 이미 기록에 저장했는가 (E-6). 저장한 뒤에는 같은 안내를 다시 저장하지 않는다.
+  bool _historySaved = false;
+
   /// 공유 시트가 떠 있는 중. 켜져 있으면 [allowed]가 모든 버튼을 잠근다 ("보내기" 두 번 → 시트 두 번 방지).
   /// 켜고 끄는 곳: `_shareSend`의 try/finally.
   bool get sharing => _sharing;
@@ -187,6 +191,8 @@ class GuideFlow extends ChangeNotifier {
     if (locating) s.removeAll(_stepActions);
     // P에서 확인하기 전에는 보낼 수 없다 (기능별_검토_결론 5장 관문, 필수)
     if (!_shareConfirmed) s.remove(ActionId.shareSend);
+    // 같은 안내를 두 번 저장하지 않는다 (E-6)
+    if (_historySaved) s.remove(ActionId.historySave);
     return s;
   }
 
@@ -235,10 +241,28 @@ class GuideFlow extends ChangeNotifier {
   static const notReadyNotice = '이 기능은 아직 준비 중이에요';
 
   /// 화면이 부르는 입구: 관문 → 처리 → 알림.
+  ///
+  /// 포트 구현이 계약을 어기고 예외를 던져도 화면이 멈추지 않게 여기서 한 번 받는다 (E-4).
+  /// 알림은 finally에서 부른다 — 예외로 끝나도 화면이 바뀐 상태를 그려야 하기 때문.
   Future<void> dispatch(ActionId id, [Object? arg]) async {
     if (!allows(id)) return;
-    await handle(id, arg);
-    notifyListeners();
+    try {
+      await handle(id, arg);
+    } catch (e, st) {
+      debugPrint('[flow] $id 실패: $e\n$st');
+      _pendingId = null;
+      _slowTimer?.cancel();
+      slow = false;
+      locating = false;
+      _capturing = false;
+      _loadingRecords = false;
+      _sharing = false;
+      notice = '문제가 생겼어요. 다시 시도해 주세요';
+      // 분석 중에 터졌으면 스피너에 갇히지 않게 오류 화면으로 보낸다.
+      if (screen.stage == Stage.analyze) _fail(ErrorCode.analysisFailed);
+    } finally {
+      notifyListeners();
+    }
   }
 
   /// 버튼 등록부: "누르면 무엇을 하나"만. 관문을 거치지 않으므로 화면은 반드시 [dispatch]를 부른다.
@@ -319,7 +343,10 @@ class GuideFlow extends ChangeNotifier {
       if (access != PickStatus.ok) {
         return _onPickFailed(access, InputKind.gallery);
       }
-      galleryItems = await _gallery.recent();
+      final page = await _gallery.recent();
+      // 목록을 읽지 못한 것과 "사진이 0장"은 다르다 (E-3).
+      if (page.failed) return _fail(ErrorCode.imageReadFailed);
+      galleryItems = page.items;
       selectedId = null;
       _go(ScreenId.g, FlowState.idle);
     } finally {
@@ -467,6 +494,8 @@ class GuideFlow extends ChangeNotifier {
     if (r.screenId == null) return _fail(ErrorCode.unknownScreen);
     result = r;
     availableActions = await _guidance.actionsFor(r.screenId!);
+    // 기다리는 사이 사용자가 취소했으면 결과 화면으로 끌고 가지 않는다 (E-5).
+    if (screen.stage != Stage.analyze) return;
     _go(
       _scene(gallery: ScreenId.rg, camera: ScreenId.rc),
       FlowState.identified,
@@ -539,6 +568,7 @@ class GuideFlow extends ChangeNotifier {
         ],
       ),
     );
+    _historySaved = true;
     notice = '안내 기록에 저장했어요';
   }
 
@@ -587,7 +617,11 @@ class GuideFlow extends ChangeNotifier {
 
   /// P의 "확인했어요" → SHARE. 여기서만 "확인함"을 켠다 → shareSend가 열린다 (관문, 검토 결론 5장 필수).
   void _shareConfirm() {
-    if (shareDraft == null) return;
+    if (shareDraft == null) {
+      // 버튼만 열려 있고 눌러도 아무 일이 없는 상태를 만들지 않는다 (E-9).
+      notice = '공유할 내용이 없어요';
+      return;
+    }
     _shareConfirmed = true;
     _go(ScreenId.share, state);
   }
@@ -607,9 +641,17 @@ class GuideFlow extends ChangeNotifier {
           notice = '공유했어요';
         case ShareOutcome.dismissed:
           break; // 사용자가 닫음: 문구 없이 돌아간다
+        case ShareOutcome.unknown:
+          // 플랫폼이 결과를 알려주지 않았다. 성공으로 단정하지 않고 사실만 알린다 (E-7, 11/23 결정).
+          notice = '공유 시트를 열었어요';
         case ShareOutcome.failed:
           notice = '공유하지 못했어요. 다시 시도해 주세요';
       }
+      await _leaveShare();
+    } catch (e) {
+      // 공유 시트·구현이 던져도 SHARE 화면에 갇히지 않게 한다 (E-2).
+      debugPrint('[share] 실패: $e');
+      notice = '공유하지 못했어요. 다시 시도해 주세요';
       await _leaveShare();
     } finally {
       _sharing = false; // 어느 길로 끝나도 잠금을 푼다
@@ -665,6 +707,7 @@ class GuideFlow extends ChangeNotifier {
     try {
       final e = await _history.get(id);
       if (e == null) {
+        openedEntry = null; // 없는 기록이 펼쳐진 채 남지 않게 (E-8)
         historyItems = await _history.list();
         return;
       }
@@ -763,6 +806,7 @@ class GuideFlow extends ChangeNotifier {
     error = null;
     slow = false;
     _shareConfirmed = false;
+    _historySaved = false;
     _failedStage = null;
     _deniedInput = null;
     _go(ScreenId.h, FlowState.idle);
@@ -850,36 +894,3 @@ class GuideFlow extends ChangeNotifier {
   }
 }
 
-/// 공유할 내용 한 묶음 (11/22 결정 ①). P는 [candidates]만, SHARE(5-5)는 [title]·[steps]로 보낼 글을 만든다.
-/// 이미지·화면에서 읽은 글자는 담지 않는다 — 단계 문구는 기능 맵에 사람이 써 둔 글이다 (검토 결론 5장).
-class ShareDraft {
-  const ShareDraft({
-    required this.title,
-    required this.steps,
-    required this.candidates,
-    required this.from,
-    this.historyId,
-  });
-
-  /// 기능 제목
-  final String title;
-
-  /// 단계 문구
-  final List<String> steps;
-
-  /// 개인정보 후보 (P가 보여 준다)
-  final List<ShareCandidate> candidates;
-
-  /// 들어온 곳: [ScreenId.done] 또는 [ScreenId.history]. 뒤로 갈 곳.
-  final ScreenId from;
-
-  /// 기록에서 왔을 때 그 기록 id (돌아가서 다시 펼치려고)
-  final String? historyId;
-}
-
-/// P에 보이는 개인정보 후보 한 줄. 기록에서 왔으면 가린 값이 없다(null).
-class ShareCandidate {
-  const ShareCandidate({required this.type, this.masked});
-  final String type;
-  final String? masked;
-}

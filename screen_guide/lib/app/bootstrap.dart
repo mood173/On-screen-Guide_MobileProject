@@ -70,6 +70,12 @@ class AppDependencies {
     sharer: sharer,
     mapUpdater: mapUpdater,
   );
+
+  /// 앱이 끝날 때 여는 자원을 닫는다 (E-10). 기록 DB만 닫을 것이 있고, 없으면 아무 일도 하지 않는다.
+  Future<void> dispose() async {
+    final h = history;
+    if (h is SqliteHistoryRepository) await h.close();
+  }
 }
 
 AppDependencies bootstrap({bool? fake}) {

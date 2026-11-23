@@ -32,26 +32,26 @@
 
 | 구분 | 건수 | 내용 |
 |---|---|---|
-| ✅ 수정 완료 | **1** | E-1 EXIF 회전 (카메라 세로 사진에서 위치 상자 어긋남) |
-| ⬜ 미수정 | **12** | E-2~E-6, E-8~E-14 |
-| ⏳ 팀 결정 | **1** | E-7 공유 결과 `unavailable → sent` 해석 |
+| ✅ 수정 완료 | **14** | E-1~E-14 (2026-11-23 코드 반영, E-7은 C안으로 종결) |
+
+> 전/후 코드·검증 방법은 **[screen_guide_수정이력_2026-11-23.md](screen_guide_수정이력_2026-11-23.md)** 에 있다.
 
 | ID | 제목 | 위치(핵심) | 상태 | 사용자 영향 |
 |---|---|---|---|---|
 | E-1 | EXIF 회전 미반영 → 상자 어긋남 | `Analyzer.kt` / `ScreenImage` | ✅ | 카메라 세로 사진에서 안내 위치 틀림 |
-| E-2 | 공유 시트 예외 시 SHARE에 갇힘 | `guide_flow.dart:598` | ⬜ | 눌러도 무반응 |
-| E-3 | 갤러리 읽기 실패가 "사진 없음"으로 위장 | `media_gallery_input.dart:144` | ⬜ | 있는 사진이 없다고 보임 |
-| E-4 | 흐름 계층 `catch` 0개 | `guide_flow.dart:238/247` | ⬜ | 예외 시 화면 정지 |
-| E-5 | 분석 취소가 늦은 결과로 덮어써짐 | `guide_flow.dart:469` | ⬜ | 취소했는데 결과 화면으로 튐(잠재) |
-| E-6 | 완료 화면 연타 → 기록 중복 | `guide_flow.dart:522` | ⬜ | 같은 기록 N건 |
-| E-7 | `unavailable → sent` | `share_plus_sharer.dart:44` | ⏳ | "공유했어요"가 거짓일 수 있음 |
-| E-8 | 기록 재조회 실패 시 펼침 미정리 | `guide_flow.dart:663` | ⬜ | 없는 기록이 펼쳐진 채 남음(사소) |
-| E-9 | P 진입 draft null 시 무반응 버튼 | `app.dart:93` / `guide_flow.dart:589` | ⬜ | 방어 필요 |
-| E-10 | DB `close()` 호출자 0 | `sqlite_history_repository.dart:111` | ⬜ | 현재 무해(수명주기) |
-| E-11 | 화면 11개가 홈으로 조용히 폴백 | `app.dart:109` | ⬜ | 잘못된 화면 표시 가능 |
-| E-12 | `coordinate_mapper` 미병합(중복) | `screen_image.dart:73-80` | ⬜ | 동작 무관, 병합 시 정리 |
-| E-13 | `ShareDraft`가 app 계층 / 885줄 | `guide_flow.dart:855` | ⬜ | 유지보수 |
-| E-14 | `.gitattributes` 없음(CRLF/LF) | 루트 | ⬜ | diff 234파일, 커밋 오염 |
+| E-2 | 공유 시트 예외 시 SHARE에 갇힘 | `guide_flow.dart` `_shareSend` | ✅ | 실패해도 안내 후 들어온 곳으로 |
+| E-3 | 갤러리 읽기 실패가 "사진 없음"으로 위장 | `image_input.dart` `GalleryPage` | ✅ | 읽기 실패 → E(IMAGE_READ_FAILED) |
+| E-4 | 흐름 계층 `catch` 0개 | `guide_flow.dart` `dispatch` | ✅ | 예외 시 안내 + 분석 중이면 E |
+| E-5 | 분석 취소가 늦은 결과로 덮어써짐 | `guide_flow.dart` `_analyzeFirst` | ✅ | 취소가 결과로 덮이지 않음 |
+| E-6 | 완료 화면 연타 → 기록 중복 | `guide_flow.dart` `_historySaved` | ✅ | 같은 세션은 1건만 |
+| E-7 | `unavailable → sent` | `sharer.dart` `ShareOutcome.unknown` | ✅ | 결과 미확인을 "공유했어요"로 단정하지 않음 |
+| E-8 | 기록 재조회 실패 시 펼침 미정리 | `guide_flow.dart` `_openEntry` | ✅ | 없는 기록은 접힌다 |
+| E-9 | P 진입 draft null 시 무반응 버튼 | `guide_flow.dart` `_shareConfirm` | ✅ | 문구 안내로 대체 |
+| E-10 | DB `close()` 호출자 0 | `bootstrap.dart` `dispose()` + `main` | ✅ | 앱 종료 시 연결 정리 |
+| E-11 | 화면 11개가 홈으로 조용히 폴백 | `app.dart` 전수 case | ✅ | 무엇이 없는지 화면에 표시 |
+| E-12 | `coordinate_mapper` 미병합(중복) | `shared/coordinate_mapper.dart` | ✅ | 계산 한 벌로 통합 |
+| E-13 | `ShareDraft`가 app 계층 | `features/share/domain/share_draft.dart` | ✅ | 레이어 정상화 |
+| E-14 | `.gitattributes` 없음(CRLF/LF) | 루트 `.gitattributes` | ✅ | diff 노이즈 제거(234→실변경만) |
 
 ---
 
@@ -161,7 +161,7 @@ flutter pub get
 | # | 명령 | 기대 결과 | 실패하면 |
 |---|---|---|---|
 | A | `flutter analyze` | **0 issues** | 경고 대부분은 `empty_catches`(catch (_) 18곳, E-4 계열). 실제 오류와 구분해 읽기 |
-| B | `flutter test` | 전부 pass (선언 215곳, 포트 공용 시험이 여러 번 호출되어 실행 건수는 더 많음) | 먼저 `test/ports/*` 부터 (계약 위반이면 나머지도 연쇄 실패) |
+| B | `flutter test` | 전부 pass (test/testWidgets 선언 **218곳**, 포트 공용 시험이 여러 번 호출되어 실행 건수는 더 많음) | 먼저 `test/ports/*` 부터 (계약 위반이면 나머지도 연쇄 실패) |
 | C | `cd android; .\gradlew.bat :app:testDebugUnitTest` | **72건 pass** (GuideLogic 28 + Rules 32 + ChannelCodec 7 + **UprightSize 5**) | Gradle wrapper 없으면 `flutter build apk` 1회 먼저 |
 
 ## 4-3. 이번 수정의 자동 검증 포인트
@@ -297,13 +297,18 @@ flutter run --dart-define=FAKE_ANALYZER=false
 | "카메라·사진 권한 관리" | 기기 앱 설정 열림 |
 | "안내 자료 버전" | `2026-11-13.1` (맵 revision) |
 
-## T10. 알려진 결함 확인 (수정 전 확인용)
+## T10. 이번에 고친 결함의 회귀 확인
 
-| 확인 | 현재 예상 동작(결함) |
-|---|---|
-| DONE에서 "저장" 연타 2회 | 기록 2건 (E-6) |
-| 공유 시트에서 예외(비행기 모드 등) | SHARE에 갇힘 (E-2) — **수정 전에는 재현될 수 있음** |
-| 사진은 있는데 목록이 빔 | "최근 사진이 없어요" (E-3) |
+| 확인 | 기대(수정 후) | 실패면 |
+|---|---|---|
+| DONE에서 "저장" 연타 2회 | 기록 **1건**, 두 번째부터 버튼 비활성 (E-6) | `allowed`의 `_historySaved` 제거 확인 |
+| 공유 중 예외(비행기 모드·공유 앱 없음) | "공유하지 못했어요" 안내 후 **들어온 곳으로 복귀** (E-2) | `_shareSend`의 `catch` 확인 |
+| 공유 결과를 플랫폼이 안 알려줌 | "공유 시트를 열었어요" — **"공유했어요"가 아님** (E-7) | `ShareOutcome.unknown` 매핑 확인 |
+| 목록은 읽히는데 비어 있음 | "최근 사진이 없어요" (정상) | — |
+| 목록 읽기 자체가 실패 | **E 화면** + IMAGE_READ_FAILED (E-3) | `GalleryPage.failed` 전달 확인 |
+| 분석기가 예외 | "문제가 생겼어요" + **E 화면** (E-4) | `dispatch`의 `catch` 확인 |
+| 분석 중 취소 후 시간 경과 | GR/CR 유지, 결과 화면으로 안 튐 (E-5) | `_analyzeFirst`의 stage 재확인 |
+| 오버레이 화면 진입 시도 | "실시간 안내는 아직 준비 중이에요" (E-11) | `app.dart` case 존재 |
 
 ---
 
@@ -354,22 +359,27 @@ adb shell am force-stop <패키지>              # 재시작 시나리오
 
 1. **제출/최신 앱 확정**: `screen_guide` vs `screen_guide_test`
    → `docs/AGENT.md`와 `screen_guide/README.md`의 문구를 같은 기준으로 고친다.
-2. **E-7 공유 결과 정책**: `unavailable`을 `sent`로 볼지 / `dismissed`로 볼지 / 문구를 중립화할지.
+2. **E-7 공유 결과 정책 — 완료**: 11/23 C안으로 결정(`ShareOutcome.unknown`, 문구 "공유 시트를 열었어요").
+   실기기에서 `unavailable`이 얼마나 자주 오는지만 로그로 확인하면 된다(동작에는 영향 없음).
 
-## 9-2. 코드 수정 (권장 순서)
+## 9-2. 코드 수정 (2026-11-23 반영 완료)
 
-| 순서 | 작업 | 파일 | 규모 |
+| 순서 | 작업 | 파일 | 상태 |
 |---|---|---|---|
-| 1 | `dispatch` 최상위 `try/catch` + `notifyListeners`를 `finally`로 | `guide_flow.dart:238` | ~10줄 |
-| 2 | `_shareSend` `catch` (실패 시 안내 + `_leaveShare`) | `guide_flow.dart:598` | ~6줄 |
-| 3 | 취소 가드 `if (screen.stage != Stage.analyze) return;` | `guide_flow.dart:469` | 1줄 |
-| 4 | 저장 멱등/버튼 잠금 | `guide_flow.dart:522` + `done_screen.dart` | ~5줄 |
-| 5 | 갤러리 실패 구분(`GalleryPage{failed}`) | `image_input.dart`, `media_gallery_input.dart`, `gallery_screen.dart` | ~20줄 |
-| 6 | `_openEntry` 미발견 시 펼침 정리 | `guide_flow.dart:663` | 1줄 |
-| 7 | P 버튼 비활성 조건(draft null) | `guide_flow.dart:589` | 1줄 |
-| 8 | `.gitattributes` + `git add --renormalize .` | 루트 | 1파일 |
-| 9 | `ShareDraft`/`ShareCandidate` → `features/share/domain/` | 구조 | 중 |
-| 10 | `GuideFlow` 분리(기록/공유), DB close 수명주기, 미라우팅 화면 명시 | 구조 | 큼 |
+| 1 | `dispatch` 최상위 `try/catch` + `notifyListeners`를 `finally`로 | `guide_flow.dart` | ✅ |
+| 2 | `_shareSend` `catch` (실패 시 안내 + `_leaveShare`) | `guide_flow.dart` | ✅ |
+| 2-1 | E-7 공유 결과 미확인(`ShareOutcome.unknown`) + 중립 안내 | `sharer.dart`, `share_plus_sharer.dart`, `guide_flow.dart` | ✅ |
+| 3 | 취소 가드 `if (screen.stage != Stage.analyze) return;` | `guide_flow.dart` | ✅ |
+| 4 | 저장 멱등(`_historySaved`) | `guide_flow.dart` | ✅ |
+| 5 | 갤러리 실패 구분(`GalleryPage.failed`) | `image_input.dart` 외 3 | ✅ |
+| 6 | `_openEntry` 미발견 시 펼침 정리 | `guide_flow.dart` | ✅ |
+| 7 | P draft null 시 안내 문구 | `guide_flow.dart` | ✅ |
+| 8 | `.gitattributes` (`* text=auto`) | 루트 | ✅ (renormalize 커밋은 팀이 1회) |
+| 9 | `ShareDraft`/`ShareCandidate` → `features/share/domain/` | 구조 | ✅ |
+| 10 | DB close 수명주기 · 미라우팅 화면 명시 | `bootstrap`/`main`/`app.dart` | ✅ |
+| 11 | `GuideFlow` 885줄 분리 | 구조 | ⬜ (다음 작업, 동작 무관) |
+
+**추가된 시험**: Dart 3건(E-6 중복 저장, E-4 예외 복구, E-7 미확인 안내) · Kotlin 5건(EXIF 크기 보정).
 
 ---
 

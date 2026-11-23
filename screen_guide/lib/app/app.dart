@@ -106,7 +106,19 @@ class _FlowShellState extends State<FlowShell> {
           ? () => flow.dispatch(ActionId.navBack)
           : null,
     ),
-    _ => HomeScreen(flow: flow),
+    // 기기 기본 카메라가 화면을 대신하는 동안의 앱 장면 (C). 도달하면 안내만 그린다.
+    ScreenId.c => const _NotBuilt('카메라 촬영 화면은 기기 카메라가 대신해요'),
+    // 실시간 안내(오버레이)는 일정 제외. 라우팅을 숨기지 않고 명시한다 (E-11).
+    ScreenId.lp ||
+    ScreenId.l ||
+    ScreenId.lo ||
+    ScreenId.lt ||
+    ScreenId.lx ||
+    ScreenId.lg1 ||
+    ScreenId.lg2 ||
+    ScreenId.lg3 ||
+    ScreenId.lg4 ||
+    ScreenId.lg5 => const _NotBuilt('실시간 안내는 아직 준비 중이에요'),
   };
 
   @override
@@ -131,4 +143,27 @@ class _FlowShellState extends State<FlowShell> {
       ),
     );
   }
+}
+
+/// 아직 화면이 없는 장면의 자리. 조용히 홈으로 폴백하지 않고 무엇이 없는지 보여 준다 (E-11).
+class _NotBuilt extends StatelessWidget {
+  const _NotBuilt(this.message);
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
+      ),
+    ),
+  );
 }

@@ -17,7 +17,7 @@ Future<ShareResultStatus> _shareWithSharePlus(String text) async =>
 /// |---|---|
 /// | `success` (사용자가 앱을 고름) | `sent` |
 /// | `dismissed` (시트를 닫음) | `dismissed` |
-/// | `unavailable` (시트는 열렸지만 결과를 알 수 없음) | `sent` [제안 — 팀 확인] |
+/// | `unavailable` (시트는 열렸지만 결과를 알 수 없음) | `unknown` — 성공으로 단정하지 않는다 (11/23 결정) |
 /// | 빈 텍스트, 예외 | `failed` |
 ///
 /// Android는 "앱을 골랐다"까지만 알려 준다. 고른 앱에서 실제로 보냈는지는 알 수 없다.
@@ -41,6 +41,6 @@ class SharePlusSharer implements Sharer {
   static ShareOutcome outcomeOf(ShareResultStatus status) => switch (status) {
     ShareResultStatus.success => ShareOutcome.sent,
     ShareResultStatus.dismissed => ShareOutcome.dismissed,
-    ShareResultStatus.unavailable => ShareOutcome.sent,
+    ShareResultStatus.unavailable => ShareOutcome.unknown,
   };
 }

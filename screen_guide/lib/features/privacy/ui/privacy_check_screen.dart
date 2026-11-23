@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:screen_guide/app/guide_flow.dart' show ShareCandidate;
+import 'package:screen_guide/features/share/domain/share_draft.dart';
 import 'package:screen_guide/shared/cells/guide_scaffold.dart';
 import 'package:screen_guide/shared/theme/app_tokens.dart';
 

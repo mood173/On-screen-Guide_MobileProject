@@ -47,13 +47,26 @@ class PickedImage {
   bool get ok => status == PickStatus.ok && path != null;
 }
 
+/// 갤러리 목록 한 번 읽기 결과. 빈 목록과 "읽지 못했다"를 구분한다 (E-3).
+///
+/// 예전에는 실패를 `[]`로 돌려줘서 화면이 "최근 사진이 없어요"로 오인했다.
+class GalleryPage {
+  const GalleryPage({required this.items, required this.failed});
+
+  final List<GalleryItem> items;
+
+  /// 읽기 자체가 실패했는가. true면 흐름은 E(IMAGE_READ_FAILED)로 보낸다.
+  /// 권한 거부는 여기가 아니라 [GalleryInput.requestAccess]가 판단한다.
+  final bool failed;
+}
+
 /// 갤러리 장면이 쓰는 포트. 정지 이미지 1장만 (제약 C01). 위치 등 메타데이터는 요청하지 않는다.
 abstract interface class GalleryInput {
   /// 사진 접근 권한 확인·요청. ok 또는 permissionDenied.
   Future<PickStatus> requestAccess();
 
   /// 최근 사진·스크린샷 (최근 것부터, 최대 [limit]장)
-  Future<List<GalleryItem>> recent({int limit = 9});
+  Future<GalleryPage> recent({int limit = 9});
 
   /// 고른 한 장을 앱 복사본으로 준비한다.
   Future<PickedImage> use(String id);
