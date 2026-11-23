@@ -83,6 +83,12 @@ abstract final class AppText {
     color: AppColors.textPrimary,
     height: 1.4,
   ); // 홈 큰 제목
+  static const pageTitle = TextStyle(
+    fontSize: 28,
+    fontWeight: _w7,
+    color: AppColors.textPrimary,
+    height: 1.45,
+  ); // 기록 "내가 찾은 사용법" (Figma 15:269)
   static const title = TextStyle(
     fontSize: 20,
     fontWeight: _w7,

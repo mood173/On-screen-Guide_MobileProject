@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:screen_guide/app/guide_flow.dart';
+import 'package:screen_guide/shared/cells/app_tab_bar.dart';
 import 'package:screen_guide/shared/contracts/action_id.dart';
 import 'package:screen_guide/shared/theme/app_tokens.dart';
 
@@ -79,7 +80,12 @@ class HomeScreen extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 16, bottom: 12),
-                child: _BottomNav(flow: flow),
+                child: AppTabBar(
+                  active: AppTab.home,
+                  onHome: _on(flow, ActionId.navHome),
+                  onHistory: _on(flow, ActionId.navHistory),
+                  onSettings: _on(flow, ActionId.navSettings),
+                ),
               ),
             ],
           ),
@@ -227,45 +233,6 @@ class _InputTile extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _BottomNav extends StatelessWidget {
-  const _BottomNav({required this.flow});
-  final GuideFlow flow;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget item(String label, bool active, VoidCallback? onTap) => Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Center(
-          child: Text(
-            label,
-            style: AppText.tab.copyWith(
-              color: active ? AppColors.primary : AppColors.textSecondary,
-              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
-    return Container(
-      height: 80,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-      ),
-      child: Row(
-        children: [
-          item('⌂  홈', true, null),
-          item('◷  기록', false, _on(flow, ActionId.navHistory)),
-          item('⚙  설정', false, _on(flow, ActionId.navSettings)),
-        ],
       ),
     );
   }

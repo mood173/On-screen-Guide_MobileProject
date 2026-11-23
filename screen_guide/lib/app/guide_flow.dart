@@ -18,6 +18,7 @@ import 'package:screen_guide/shared/contracts/analysis.dart';
 import 'package:screen_guide/shared/contracts/error_code.dart';
 import 'package:screen_guide/shared/contracts/flow_state.dart';
 import 'package:screen_guide/shared/contracts/screen_id.dart';
+import 'package:screen_guide/shared/share_text.dart';
 
 /// 흐름 입구 (시스템설계_최종 6-2).
 ///
@@ -54,8 +55,7 @@ class GuideFlow extends ChangeNotifier {
   final GalleryInput _gallery; // 최정혁 (사진 가져오기)
   final CameraInput _camera; // 최정혁 (기기 기본 카메라)
   final InputCleanup _cleanup; // 최정혁
-  // ignore: unused_field
-  final Sharer _sharer; // 최정혁 — 공유(P → SHARE)를 만들 때 사용
+  final Sharer _sharer; // 최정혁 — SHARE의 "보내기"(shareSend)에서만 부른다
   final MapUpdater _mapUpdater; // 최정혁
 
   /// 기록 시각 (시험에서 고정할 수 있게 주입)
@@ -100,14 +100,35 @@ class GuideFlow extends ChangeNotifier {
 
   /// 공유 전 확인(P)에서 "확인했어요"를 눌렀는가. 꺼져 있으면 `shareSend`를 잠근다.
   /// 화면이 바꿀 수 없게 비공개로 두고 읽기만 열어 둔다 (협업규격 3.6: 세션 값은 흐름이 가진다).
-  /// 공유 단계에 들어올 때 끄는 곳은 [_onEnter]. 켜는 곳(shareConfirm)은 공유 화면을 만들 때(협업규격 4.2 5번) 넣는다.
+  /// 끄는 곳: 공유 단계에 들어올 때 [_onEnter]. 켜는 곳: P의 "확인했어요" [_shareConfirm] 한 곳뿐.
   bool get shareConfirmed => _shareConfirmed;
   bool _shareConfirmed = false;
+
+  /// 공유할 내용 (P·SHARE가 읽는다). `sharePrepare`를 누를 때 만들고, 공유 단계를 떠날 때 _onExit(share)가 지운다.
+  /// P는 이 안의 [ShareDraft.candidates]만 읽는다 (검토 결론 5장: 확인 화면이 받는 값은 유형과 가린 값의 목록만).
+  ShareDraft? shareDraft;
+
+  /// SHARE 화면 미리보기 = 실제로 보낼 글. 보내기(_shareSend)와 같은 함수로 만든다 → 보이는 것과 보내는 것이 같다.
+  String? get shareText {
+    final d = shareDraft;
+    return d == null ? null : buildShareText(title: d.title, steps: d.steps);
+  }
 
   /// 사진을 가져오는 중 (갤러리 권한·목록·사용, 카메라 촬영). 켜져 있으면 [allowed]가 모든 버튼을 잠근다.
   /// 켜고 끄는 곳: `_openGallery`·`_confirm`·`_takePhoto`의 try/finally (어느 길로 끝나도 꺼진다).
   bool get capturing => _capturing;
   bool _capturing = false;
+
+  /// 기록·설정 값을 읽는 중 (목록·한 건·지우기·revision). 켜져 있으면 [allowed]가 모든 버튼을 잠근다.
+  /// 읽는 사이 다른 탭을 누르면, 늦게 끝난 읽기가 마지막에 누른 화면을 덮어쓰기 때문 (5-3a 점검에서 발견).
+  /// 켜고 끄는 곳: `_openHistory`·`_openEntry`·`_deleteEntry`·`_openSettings`의 try/finally.
+  bool get loadingRecords => _loadingRecords;
+  bool _loadingRecords = false;
+
+  /// 공유 시트가 떠 있는 중. 켜져 있으면 [allowed]가 모든 버튼을 잠근다 ("보내기" 두 번 → 시트 두 번 방지).
+  /// 켜고 끄는 곳: `_shareSend`의 try/finally.
+  bool get sharing => _sharing;
+  bool _sharing = false;
 
   /// 권한이 거부된 입력 방식 (협업규격 3.4 "거부된 입력 방식을 세션에 기록", 3.6 세션 값).
   /// 권한 안내 화면(DENY)이 이 값을 보고 "설정 열기"와 "다른 방법으로 대신하기"를 고른다.
@@ -123,6 +144,21 @@ class GuideFlow extends ChangeNotifier {
 
   /// 식별된 화면에서 고를 수 있는 기능 (GuidanceRepository.actionsFor 결과)
   List<GuideAction> availableActions = const [];
+
+  // ── 기록 화면(HISTORY)이 읽는 값. 안내 세션 값이 아니다 (시스템설계 9장 "세션 변화 —") ──
+  // 기록 단계를 떠날 때 _onExit(records)가 비운다.
+
+  /// 기록 목록 (최근 것부터). 탭으로 들어올 때와 지운 뒤에 다시 읽는다.
+  List<HistoryEntry> historyItems = const [];
+
+  /// 펼쳐 본 기록 한 건 (다시 보기). null이면 목록만 보인다.
+  HistoryEntry? openedEntry;
+
+  /// 설정 화면(SETTINGS)에 보이는 기능 맵 revision (역할설계 D7). 설정 탭으로 들어올 때 읽는다.
+  /// 기록 ↔ 설정은 같은 기록 단계라 서로 오가도 _onExit(records)가 돌지 않는다 → 위 기록 값이 남지만,
+  /// 기록 탭으로 돌아오면 _openHistory가 새로 읽으니 화면에 낡은 값이 보이지 않는다.
+  String? mapRevision;
+
   int get totalSteps => action?.steps.length ?? 0;
   GuideStep? get currentStep => action?.steps[step];
 
@@ -142,6 +178,10 @@ class GuideFlow extends ChangeNotifier {
     // 사진을 가져오는 중에는 모든 버튼 잠금 (연타 차단, 11/14 점검에서 발견).
     // 카메라가 두 번 열리거나, 가져오는 사이 뒤로 가서 늦게 온 사진이 엉뚱한 화면을 띄우는 일을 막는다.
     if (_capturing) return {};
+    // 기록·설정 값을 읽는 중에도 같은 이유로 모두 잠금 (늦게 끝난 읽기가 화면을 덮어쓰지 않게)
+    if (_loadingRecords) return {};
+    // 공유 시트가 떠 있는 동안에도 같은 이유로 모두 잠금
+    if (_sharing) return {};
     final s = {...StageTable.always, ...StageTable.allowedOn(screen)};
     // 대상을 찾는 중에는 단계 버튼 잠금 (3-6, 중복 실행 차단)
     if (locating) s.removeAll(_stepActions);
@@ -172,9 +212,39 @@ class GuideFlow extends ChangeNotifier {
   /// 오류 화면끼리(E ↔ DENY)는 같은 복구 단계라 _onEnter가 돌지 않으므로 처음 실패한 단계가 남는다.
   Stage? _failedStage;
 
-  // ───────────── dispatch ─────────────
+  // ───────────── dispatch = 버튼 등록부 (협업규격 4.2 5번, 역할설계 U4 "switch 문") ─────────────
+  //
+  // 관문([allows])이 "지금 눌러도 되나"를 정하고, 이 switch가 "누르면 무엇을 하나"를 정한다.
+  // default를 두지 않는다: ActionId가 새로 생기고 갈래를 안 쓰면 컴파일 오류가 난다
+  // (일정_현실검토 3-2 — "모든 ID에 핸들러" 시험이 하던 일을 컴파일러가 한다).
+  // 아직 없는 기능도 숨기지 않고 하나씩 적어서 [_notReady]로 보낸다 (시스템설계 6-2 ActionRegistry 줄: "핸들러가 있거나 '준비 중'으로 명시").
+
+  /// 누르면 "준비 중" 문구만 나오는 버튼. 기능을 만들면 여기서 빼고 [handle]의 switch에 진짜 갈래를 쓴다.
+  /// 시험(guide_flow_test "버튼 등록부")이 28개 모두를 [handle]로 눌러 이 목록과 실제 동작이 같은지 본다.
+  static const notReady = {
+    // 이번 제출에서 만들지 않는 것
+    ActionId.syncToggle, // 동기화 동의 (일정_현실검토 3-2 [제안]: 설정 화면에서 뺌)
+    ActionId.mapCheck, // Firebase 맵 갱신 (일정_현실검토 3-2: 지금 뺌)
+    ActionId.overlaySetup, // N01 실시간 안내 (일정 제외)
+    ActionId.overlayStart,
+    ActionId.overlayStop,
+    ActionId.overlayRescan,
+  };
+
+  /// 아직 없는 기능을 눌렀을 때의 문구 (화면·시험이 같은 값을 쓰게 한 곳에 둔다).
+  static const notReadyNotice = '이 기능은 아직 준비 중이에요';
+
+  /// 화면이 부르는 입구: 관문 → 처리 → 알림.
   Future<void> dispatch(ActionId id, [Object? arg]) async {
     if (!allows(id)) return;
+    await handle(id, arg);
+    notifyListeners();
+  }
+
+  /// 버튼 등록부: "누르면 무엇을 하나"만. 관문을 거치지 않으므로 화면은 반드시 [dispatch]를 부른다.
+  /// 시험만 직접 부른다 — 관문이 막는 버튼(홈에서 못 누르는 공유·기록 등)도 등록부를 확인하려고 (5-1 점검에서 발견).
+  @visibleForTesting
+  Future<void> handle(ActionId id, [Object? arg]) async {
     switch (id) {
       case ActionId.captureGallery:
         await _openGallery();
@@ -210,11 +280,33 @@ class GuideFlow extends ChangeNotifier {
         await _reset();
       case ActionId.historySave:
         await _saveHistory();
-      default:
-        notice = '이 기능은 아직 준비 중이에요';
+      case ActionId.navHistory:
+        await _openHistory();
+      case ActionId.historyOpen:
+        if (arg is String) await _openEntry(arg);
+      case ActionId.historyDelete:
+        if (arg is String) await _deleteEntry(arg);
+      case ActionId.navSettings:
+        await _openSettings();
+      case ActionId.sharePrepare:
+        _sharePrepare();
+      case ActionId.shareConfirm:
+        _shareConfirm();
+      case ActionId.shareSend:
+        await _shareSend();
+      // ── 아직 없는 기능: 하나씩 적는다 (목록은 [notReady]와 같아야 한다) ──
+      case ActionId.syncToggle:
+      case ActionId.mapCheck:
+      case ActionId.overlaySetup:
+      case ActionId.overlayStart:
+      case ActionId.overlayStop:
+      case ActionId.overlayRescan:
+        _notReady();
     }
-    notifyListeners();
   }
+
+  /// 아직 없는 기능: 화면은 그대로 두고 문구만 한 번 보여 준다.
+  void _notReady() => notice = notReadyNotice;
 
   void clearNotice() => notice = null;
 
@@ -450,8 +542,150 @@ class GuideFlow extends ChangeNotifier {
     notice = '안내 기록에 저장했어요';
   }
 
-  /// HISTORY 화면이 읽는다.
-  Future<List<HistoryEntry>> historyList() => _history.list();
+  // ───────────── 공유 (시스템설계 3-8, 검토 결론 5장) ─────────────
+
+  /// "공유하기" → P. 들어오는 곳은 마무리(DONE)와 기록(HISTORY) 두 곳 (3-8).
+  /// 공유 단계로 넘어가면 기록 값이 비워지므로(_onExit(records)) **화면을 바꾸기 전에** 묶음을 먼저 만든다.
+  void _sharePrepare() {
+    final ShareDraft? d;
+    switch (screen) {
+      case ScreenId.done:
+        // 마무리: 이번 세션의 기능과 첫 분석의 후보 (유형 + 가린 값)
+        final a = action;
+        d = a == null
+            ? null
+            : ShareDraft(
+                title: a.title,
+                steps: [for (final s in a.steps) s.instruction],
+                candidates: [
+                  for (final p in result?.pii ?? const <PiiCandidate>[])
+                    ShareCandidate(type: p.type, masked: p.masked),
+                ],
+                from: ScreenId.done,
+              );
+      case ScreenId.history:
+        // 기록: 펼쳐 둔 기록. 가린 값은 저장하지 않으므로 유형 이름만 (검토 결론 5장, 필수)
+        final e = openedEntry;
+        d = e == null
+            ? null
+            : ShareDraft(
+                title: e.actionTitle,
+                steps: e.stepInstructions,
+                candidates: [
+                  for (final t in e.piiTypes) ShareCandidate(type: t),
+                ],
+                from: ScreenId.history,
+                historyId: e.id,
+              );
+      default:
+        d = null; // 단계 설정표상 다른 화면에서는 열리지 않는다
+    }
+    if (d == null) return; // 공유할 내용이 없다 (기록을 펼치지 않음 등)
+    shareDraft = d;
+    _go(ScreenId.p, state); // 공유 단계에 들어갈 때 _onEnter(share)가 "확인함"을 지운다
+  }
+
+  /// P의 "확인했어요" → SHARE. 여기서만 "확인함"을 켠다 → shareSend가 열린다 (관문, 검토 결론 5장 필수).
+  void _shareConfirm() {
+    if (shareDraft == null) return;
+    _shareConfirmed = true;
+    _go(ScreenId.share, state);
+  }
+
+  /// SHARE의 "보내기". 관문이 "확인함"이 켜져 있을 때만 이 버튼을 연다 (P를 거친 뒤에만, 검토 결론 5장 필수).
+  /// 보내는 것은 기능 제목 + 단계 문구로 만든 글뿐 (5-5a buildShareText).
+  /// 결과 (3-8): 보냄·닫음 → 들어온 곳 / 실패 → 안내 문구 후 들어온 곳.
+  Future<void> _shareSend() async {
+    final text = shareText;
+    // 관문이 막지만 한 번 더 확인 (보내는 곳은 여기 하나)
+    if (text == null || !_shareConfirmed) return;
+    _sharing = true;
+    try {
+      final outcome = await _sharer.shareText(text);
+      switch (outcome) {
+        case ShareOutcome.sent:
+          notice = '공유했어요';
+        case ShareOutcome.dismissed:
+          break; // 사용자가 닫음: 문구 없이 돌아간다
+        case ShareOutcome.failed:
+          notice = '공유하지 못했어요. 다시 시도해 주세요';
+      }
+      await _leaveShare();
+    } finally {
+      _sharing = false; // 어느 길로 끝나도 잠금을 푼다
+    }
+  }
+
+  /// 공유를 떠나 들어온 곳으로 (3-8 "뒤로 = 들어온 단계").
+  /// 기록에서 왔으면 기록을 다시 읽고 그 기록을 펼친 채로 돌려놓는다 (떠날 때 기록 값이 비워졌으므로).
+  Future<void> _leaveShare() async {
+    final d = shareDraft;
+    if (d == null || d.from == ScreenId.done) {
+      _go(ScreenId.done, FlowState.done);
+      return;
+    }
+    await _openHistory();
+    final id = d.historyId;
+    if (id != null) await _openEntry(id);
+  }
+
+  // ───────────── 설정 (시스템설계 3-9, 일정_현실검토 3-2 [제안] "권한 상태와 맵 revision 두 줄") ─────────────
+
+  /// 하단 탭 "설정" → SETTINGS. 맵 revision을 읽어 둔다.
+  /// 권한 상태는 읽지 않는다: 묻지 않고 상태만 읽는 포트가 없다 (requestAccess는 허용 창을 띄운다).
+  /// 대신 화면이 "권한 관리" 줄로 기기 설정을 연다(settingsOpenPermission, 이미 있음). 11/22 결정 ㉮
+  Future<void> _openSettings() async {
+    _loadingRecords = true;
+    try {
+      mapRevision = await _guidance.activeRevision();
+      _go(ScreenId.settings, FlowState.idle);
+    } finally {
+      _loadingRecords = false;
+    }
+  }
+
+  // ───────────── 기록 (시스템설계 3-9, 9장) ─────────────
+
+  /// 하단 탭 "기록" → HISTORY. 목록을 읽어 두고 화면은 [historyItems]만 그린다 (협업규격 3.6).
+  Future<void> _openHistory() async {
+    _loadingRecords = true;
+    try {
+      historyItems = await _history.list();
+      openedEntry = null;
+      _go(ScreenId.history, FlowState.idle);
+    } finally {
+      _loadingRecords = false;
+    }
+  }
+
+  /// 다시 보기: 한 건을 읽어 펼친다 (9장: `HistoryRepository.get` → 단계 문구 목록).
+  /// 그 사이 지워져 없으면 펼치지 않고 목록을 새로 읽는다.
+  Future<void> _openEntry(String id) async {
+    _loadingRecords = true;
+    try {
+      final e = await _history.get(id);
+      if (e == null) {
+        historyItems = await _history.list();
+        return;
+      }
+      openedEntry = e;
+    } finally {
+      _loadingRecords = false;
+    }
+  }
+
+  /// 지우기. "정말 지울까요?" 확인은 화면이 먼저 받는다 (3-9 규칙, 확인창은 화면 전용 상태 — 4-2 규칙 3).
+  /// 펼쳐 둔 기록을 지웠으면 펼침도 닫는다 (없는 기록이 화면에 남지 않게).
+  Future<void> _deleteEntry(String id) async {
+    _loadingRecords = true;
+    try {
+      await _history.delete(id);
+      if (openedEntry?.id == id) openedEntry = null;
+      historyItems = await _history.list();
+    } finally {
+      _loadingRecords = false;
+    }
+  }
 
   // ───────────── 복구·이동 ─────────────
   void _fail(ErrorCode code) {
@@ -493,6 +727,19 @@ class GuideFlow extends ChangeNotifier {
             _scene(gallery: ScreenId.rg, camera: ScreenId.rc),
             FlowState.identified,
           );
+        }
+      case ScreenId.share:
+        // SHARE → P 한 칸 (11/22 결정 ㉮. 3-8은 "뒤로 = 들어온 단계"지만 11/14 결정 ⑤ "장면마다 한 칸씩"을 따름).
+        // 같은 공유 단계 안이라 "확인함"은 남는다.
+        _go(ScreenId.p, state);
+      case ScreenId.p:
+        await _leaveShare(); // P → 들어온 곳 (3-8)
+      case ScreenId.history:
+        // 펼쳐 보는 중이면 목록으로, 목록이면 홈으로 (한 칸씩)
+        if (openedEntry != null) {
+          openedEntry = null;
+        } else {
+          await _reset();
         }
       default:
         await _reset();
@@ -547,15 +794,21 @@ class GuideFlow extends ChangeNotifier {
         _pendingId = null;
         _slowTimer?.cancel();
         slow = false;
+      case Stage.share:
+        // 공유할 내용은 공유 단계에서만 쓴다 (가린 값이 흐름 메모리에 오래 남지 않게)
+        shareDraft = null;
+      case Stage.records:
+        // 기록 화면의 값은 그 화면에서만 쓴다. 떠날 때 비워서 다음에 들어오면 새로 읽는다.
+        historyItems = const [];
+        openedEntry = null;
+        mapRevision = null;
       case Stage.ready:
       case Stage.waiting:
       case Stage.input:
       case Stage.choose:
       case Stage.guide:
       case Stage.finish:
-      case Stage.share:
       case Stage.recover:
-      case Stage.records:
       case Stage.overlay:
         break; // 아직 할 일 없음
     }
@@ -595,4 +848,38 @@ class GuideFlow extends ChangeNotifier {
     _slowTimer?.cancel();
     super.dispose();
   }
+}
+
+/// 공유할 내용 한 묶음 (11/22 결정 ①). P는 [candidates]만, SHARE(5-5)는 [title]·[steps]로 보낼 글을 만든다.
+/// 이미지·화면에서 읽은 글자는 담지 않는다 — 단계 문구는 기능 맵에 사람이 써 둔 글이다 (검토 결론 5장).
+class ShareDraft {
+  const ShareDraft({
+    required this.title,
+    required this.steps,
+    required this.candidates,
+    required this.from,
+    this.historyId,
+  });
+
+  /// 기능 제목
+  final String title;
+
+  /// 단계 문구
+  final List<String> steps;
+
+  /// 개인정보 후보 (P가 보여 준다)
+  final List<ShareCandidate> candidates;
+
+  /// 들어온 곳: [ScreenId.done] 또는 [ScreenId.history]. 뒤로 갈 곳.
+  final ScreenId from;
+
+  /// 기록에서 왔을 때 그 기록 id (돌아가서 다시 펼치려고)
+  final String? historyId;
+}
+
+/// P에 보이는 개인정보 후보 한 줄. 기록에서 왔으면 가린 값이 없다(null).
+class ShareCandidate {
+  const ShareCandidate({required this.type, this.masked});
+  final String type;
+  final String? masked;
 }
