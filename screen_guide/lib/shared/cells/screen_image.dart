@@ -38,15 +38,18 @@ class ScreenImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = imageWidth, h = imageHeight;
+    final sized = w != null && h != null && w > 0 && h > 0;
     final image = Image.file(
       File(path),
-      fit: w == null || h == null ? BoxFit.contain : BoxFit.fill,
+      fit: sized ? BoxFit.fill : BoxFit.contain,
       errorBuilder: (_, _, _) => const ColoredBox(
         color: AppColors.surface,
         child: Center(child: Icon(Icons.broken_image_outlined)),
       ),
     );
-    if (w == null || h == null) {
+    // 크기를 모르거나 0이면 비율을 정할 수 없다 → 사진만 그린다.
+    // (0을 그대로 AspectRatio에 넘기면 aspectRatio > 0 assert에 걸린다)
+    if (w == null || h == null || w <= 0 || h <= 0) {
       return Container(
         height: height,
         decoration: BoxDecoration(

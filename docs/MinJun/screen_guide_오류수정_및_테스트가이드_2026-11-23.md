@@ -161,7 +161,7 @@ flutter pub get
 | # | 명령 | 기대 결과 | 실패하면 |
 |---|---|---|---|
 | A | `flutter analyze` | **0 issues** | 경고 대부분은 `empty_catches`(catch (_) 18곳, E-4 계열). 실제 오류와 구분해 읽기 |
-| B | `flutter test` | 전부 pass (test/testWidgets 선언 **218곳**, 포트 공용 시험이 여러 번 호출되어 실행 건수는 더 많음) | 먼저 `test/ports/*` 부터 (계약 위반이면 나머지도 연쇄 실패) |
+| B | `flutter test` | 전부 pass (test/testWidgets 선언 **226곳**, 포트 공용 시험이 여러 번 호출되어 실행 건수는 더 많음) | 먼저 `test/ports/*` 부터 (계약 위반이면 나머지도 연쇄 실패) |
 | C | `cd android; .\gradlew.bat :app:testDebugUnitTest` | **72건 pass** (GuideLogic 28 + Rules 32 + ChannelCodec 7 + **UprightSize 5**) | Gradle wrapper 없으면 `flutter build apk` 1회 먼저 |
 
 ## 4-3. 이번 수정의 자동 검증 포인트

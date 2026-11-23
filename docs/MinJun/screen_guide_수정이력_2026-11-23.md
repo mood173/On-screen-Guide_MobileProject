@@ -15,7 +15,7 @@
 | 팀 결정 대기 | 0건 — E-7은 `unknown` 신설로 종결 (11/23 결정 C안) |
 | 수정 파일 | 기존 18개 (225 insertions / 100 deletions) |
 | 신규 파일 | `lib/shared/coordinate_mapper.dart`, `lib/features/share/domain/share_draft.dart`, 루트 `.gitattributes`, Kotlin `UprightSizeTest.kt` |
-| 추가 시험 | Dart **+3** (총 218 선언), Kotlin **+5** (총 **72**) |
+| 추가 시험 | Dart **+3** (현재 선언 **226** — 포트 공용 시험의 헬퍼 중복 호출로 실행 건수는 더 많다), Kotlin **+5** (총 **72**) |
 | 검증 수준 | 정적 검증 완료 · **컴파일/실행 미검증** (이 환경에 Flutter/Kotlin 툴체인 없음) |
 
 > 원칙: **동작을 바꾸는 최소 변경**. 공개 계약(`ActionId`·`ScreenId`·채널 JSON·`HistoryEntry`)은 그대로 두고,
@@ -250,6 +250,22 @@ final imageSize = Size(w.toDouble(), h.toDouble());
 Rect map(Box b) => mapBox(b, image: imageSize, view: c.biggest);
 ```
 
+**같은 파일 부수 수정 — 원본 크기 0 처리**
+
+`imageWidth`/`imageHeight`가 `0`일 때 `AspectRatio(aspectRatio: 0)`은 `aspectRatio > 0` assert에 걸린다.
+`test/shared/cells/screen_image_test.dart`의 "원본 크기가 0이면 깨지지 않고 사진만 그린다"가 이 경로를 검사하고 있어,
+`null`과 `0`을 **같은 경로**(사진만 그리기)로 처리하도록 고쳤다.
+
+```dart
+final sized = w != null && h != null && w > 0 && h > 0;
+final image = Image.file(..., fit: sized ? BoxFit.fill : BoxFit.contain, ...);
+if (w == null || h == null || w <= 0 || h <= 0) { return /* 사진만 */; }
+```
+
+**복구 경위**: `test/shared/coordinate_mapper_test.dart`(7건)와 `screen_image_test.dart`(2건)는
+`origin/feat/coordinate-mapper`에서 온 시험인데, 이 브랜치에는 `lib/shared/coordinate_mapper.dart`가
+없어 **컴파일조차 되지 않던 상태**였다. 이번에 lib 파일을 추가하고 크기 0 처리를 맞춰 두 시험이 성립한다.
+
 ---
 
 ### E-13 · 모델 위치 정상화
@@ -314,7 +330,7 @@ $ ScreenId 라우팅 대조
  enum 33 / case 33 / missing none / unknown none / default 없음
 
 $ 테스트 개수
- Dart test( · testWidgets( : 218
+ Dart test( · testWidgets( 선언: 226 (실행 건수는 포트 공용 시험 헬퍼 호출로 더 많음)
  Kotlin @Test: 72 (GuideLogic 28 + Rules 32 + ChannelCodec 7 + UprightSize 5)
 ```
 
